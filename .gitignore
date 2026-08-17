@@ -1,0 +1,9 @@
+bin/
+dist/
+studio.html
+!internal/assets/dist/
+!internal/assets/dist/**
+*.exe
+.env
+*.log
+web/node_modules/

@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Roboto", "Segoe UI", Tahoma, Arial, sans-serif;
+  --font-mono: Consolas, "Courier New", monospace;
+
+  --color-pg-blue: #326690;
+  --color-pg-blue-dark: #2a567a;
+  --color-pg-header-top: #35586f;
+  --color-pg-header-bottom: #233e52;
+  --color-pg-bg: #eef1f4;
+  --color-panel-bg: #ffffff;
+  --color-border: #c7c7c7;
+  --color-border-soft: #dde1e6;
+  --color-text: #1f2328;
+  --color-muted: #404854;
+  --color-menu-bg: #f5f6f8;
+  --color-menu-border: #cfd4da;
+  --color-toolbar-bg: #ffffff;
+  --color-tb-hover: #e9eef4;
+  --color-selected: #cfe0ef;
+  --color-hover: #eef4fa;
+  --color-tab-bg: #e2e5ea;
+  --color-danger: #b3261e;
+  --color-editor-bg: #1e1e1e;
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color: var(--color-text);
+    background: var(--color-pg-bg);
+  }
+
+  button { font-family: inherit; }
+}
+
+@layer components {
+  /* ---------- Buttons ---------- */
+  .btn {
+    @apply inline-flex cursor-pointer items-center gap-1.5 rounded border border-border bg-[#f7f7f7] px-3.5 py-1.5 text-[13px] text-text hover:bg-[#eceaea] disabled:cursor-default disabled:bg-[#ececec] disabled:text-[#8a919b];
+  }
+  .btn.primary {
+    @apply border-pg-blue bg-pg-blue text-white hover:bg-pg-blue-dark;
+  }
+  .btn.active {
+    @apply bg-pg-blue text-white;
+  }
+  .icon-btn {
+    @apply inline-flex cursor-pointer rounded p-1 text-muted hover:bg-tb-hover hover:text-text;
+  }
+
+  /* ---------- Shared headings ---------- */
+  .section-title {
+    @apply mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted;
+  }
+
+  /* ---------- Forms ---------- */
+  .form { @apply flex flex-col gap-2.5; }
+  .form-row { @apply flex flex-col gap-1; }
+  .form-row label { @apply text-xs font-medium text-muted; }
+  .form-row input, .form-row select {
+    @apply rounded border border-border px-2 py-1.5 font-sans text-sm focus:border-pg-blue focus:outline-1 focus:outline-pg-blue;
+  }
+  .form-grid { @apply grid grid-cols-[2fr_1fr] gap-2.5; }
+  .form-error { @apply rounded bg-[#fdecea] px-2 py-1.5 text-[13px] text-danger; }
+  .form-actions { @apply mt-1.5 flex justify-end gap-2; }
+  .check-group { @apply flex-row gap-3.5; }
+  .col-check { @apply flex items-center gap-1 text-[13px]; }
+
+  /* ---------- Create table column editor ---------- */
+  .column-editor { @apply flex flex-col gap-1.5; }
+  .column-editor-row { @apply flex items-center gap-1.5; }
+  .column-editor-row input, .column-editor-row select {
+    @apply rounded border border-border p-1 font-sans text-xs;
+  }
+  .col-name { @apply w-[120px]; }
+  .col-type { @apply w-[130px]; }
+  .col-default { @apply min-w-[60px] flex-1; }
+
+  /* ---------- Menu dropdown ---------- */
+  .dropdown-item {
+    @apply flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-[7px] text-left text-sm whitespace-nowrap text-text hover:bg-[#eaf0f6] disabled:text-[#8a919b];
+  }
+  .dropdown-item i { @apply w-[15px] text-center text-[#4a5a6b]; }
+  .dropdown-item.disabled { @apply cursor-default; }
+  .dropdown-sep { @apply my-1 h-px bg-[#e3e6ea]; }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-start justify-center pt-20;
+  }
+  .modal {
+    @apply max-w-[96vw] rounded border border-border bg-panel-bg shadow-[0_6px_20px_rgba(0,0,0,0.25)];
+  }
+  .modal-header {
+    @apply flex items-center justify-between rounded-t border-b border-border bg-[#eef0f3] px-3.5 py-2;
+  }
+  .modal-title { @apply text-sm font-medium; }
+  .modal-body { @apply max-h-[70vh] overflow-auto p-4; }
+
+  /* ---------- About ---------- */
+  .about p { @apply my-1.5 leading-relaxed; }
+}
+
+/* ---------- Query tool / CodeMirror ---------- */
+.query-editor .cm-editor { font-size: 14px; }
