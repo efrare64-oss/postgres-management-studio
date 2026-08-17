@@ -21,12 +21,18 @@ func (h *ClusterHandler) Register(r *gin.RouterGroup) {
 	r.GET("/servers/:id/dashboard", h.serverDashboard)
 	r.GET("/servers/:id/databases/:database/dashboard", h.databaseDashboard)
 	r.GET("/servers/:id/databases", h.listDatabases)
+	r.GET("/servers/:id/tablespaces", h.listTablespaces)
+	r.GET("/servers/:id/databases/:database/objects/:kind", h.listDatabaseObjects)
 	r.GET("/servers/:id/databases/:database/schemas", h.listSchemas)
+	r.GET("/servers/:id/databases/:database/schemas/:schema/objects/:kind", h.listSchemaObjects)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/tables", h.listTables)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/views", h.listViews)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/matviews", h.listMatViews)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/sequences", h.listSequences)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/functions", h.listFunctions)
+	r.GET("/servers/:id/databases/:database/schemas/:schema/tables/:table/objects/:kind", h.listTableObjects)
+	r.GET("/servers/:id/databases/:database/schemas/:schema/views/:view/objects/:kind", h.listViewObjects)
+	r.GET("/servers/:id/databases/:database/schemas/:schema/foreign-tables/:ftable/objects/:kind", h.listForeignTableObjects)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/sql/:kind/:name", h.objectSQL)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/tables/:table", h.tableDetail)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/tables/:table/triggers", h.listTriggers)
@@ -39,6 +45,8 @@ func (h *ClusterHandler) Register(r *gin.RouterGroup) {
 	r.POST("/servers/:id/roles", h.createRole)
 	r.PATCH("/servers/:id/roles/:name", h.alterRole)
 	r.DELETE("/servers/:id/roles/:name", h.dropRole)
+
+	h.registerActions(r)
 }
 
 func (h *ClusterHandler) listDatabases(c *gin.Context) {

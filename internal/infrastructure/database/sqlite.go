@@ -71,6 +71,18 @@ CREATE TABLE IF NOT EXISTS servers (
 );
 
 CREATE INDEX IF NOT EXISTS idx_servers_server_group_id ON servers (server_group_id);
+
+CREATE TABLE IF NOT EXISTS query_history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    query      TEXT    NOT NULL,
+    server_id  INTEGER NOT NULL DEFAULT 0,
+    database   TEXT    NOT NULL DEFAULT '',
+    success    INTEGER NOT NULL DEFAULT 1,
+    error      TEXT    NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_query_history_created_at ON query_history (created_at);
 `
 
 func ensureSchema(ctx context.Context, db *sql.DB) error {

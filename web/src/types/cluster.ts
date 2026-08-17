@@ -44,6 +44,11 @@ export interface TableDetail {
   constraints: Constraint[];
 }
 
+export interface CatalogObject {
+  name: string;
+  detail?: string | null;
+}
+
 export interface TableStats {
   size: string;
   index_size: string;
@@ -97,4 +102,127 @@ export interface DatabaseDashboard {
   active_queries: number;
   idle: number;
   sessions: Session[];
+}
+
+export interface TableColumn {
+  name: string;
+  data_type: string;
+  is_pk: boolean;
+}
+
+export interface TableData {
+  columns: TableColumn[];
+  rows: unknown[][];
+  total: number;
+  has_pk: boolean;
+}
+
+export interface RowChange {
+  old: Record<string, unknown>;
+  new: Record<string, unknown>;
+}
+
+export interface TableDataSave {
+  inserts: Record<string, unknown>[];
+  updates: RowChange[];
+  deletes: Record<string, unknown>[];
+}
+
+export interface DataSaveResult {
+  inserted: number;
+  updated: number;
+  deleted: number;
+}
+
+export interface ActionResult {
+  message: string;
+}
+
+export interface CountResult {
+  count: number;
+}
+
+export interface Lock {
+  pid: number;
+  database: string;
+  user: string;
+  relation: string;
+  mode: string;
+  granted: boolean;
+  wait_event: string;
+}
+
+export interface Setting {
+  name: string;
+  value: string;
+  unit: string;
+  context: string;
+  category: string;
+  description: string;
+}
+
+export interface SearchObject {
+  schema: string;
+  name: string;
+  kind: string;
+  detail: string;
+}
+
+export interface GrantInput {
+  privileges: string[];
+  object_kind: string;
+  object_name: string;
+  schema: string;
+  roles: string[];
+  with_grant: boolean;
+}
+
+export interface SequenceInput {
+  data_type: string;
+  start: number;
+  min: number;
+  max: number;
+  increment: number;
+  cache: number;
+  owner: string;
+}
+
+export interface FunctionInput {
+  language: string;
+  arguments: string;
+  return_type: string;
+  body: string;
+  volatility: string;
+  owner: string;
+  replace: boolean;
+}
+
+export interface IndexInput {
+  name: string;
+  columns: string;
+  unique: boolean;
+  method: string;
+  where: string;
+}
+
+export interface Dependency {
+  type: string;
+  schema: string;
+  name: string;
+  owner: string;
+  dep_type: string;
+}
+
+export interface Dependent {
+  type: string;
+  schema: string;
+  name: string;
+  owner: string;
+  dep_type: string;
+}
+
+export interface CSVImportResult {
+  inserted: number;
+  errors: number;
+  message: string;
 }

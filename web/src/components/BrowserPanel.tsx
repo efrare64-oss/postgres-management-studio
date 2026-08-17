@@ -1,22 +1,113 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import { Fa } from '../icons';
-import type { ServerGroup, StudioServer, TreeNode } from '../types';
+import ContextMenu, { type ContextItem, type ContextMenuState } from './ContextMenu';
+import type { CatalogObject, ContextAction, ServerGroup, StudioServer, TreeNode } from '../types';
 
-const OBJ_GROUPS = [
-  { type: 'tables', label: 'Tables', icon: 'table' },
-  { type: 'views', label: 'Views', icon: 'view' },
-  { type: 'matviews', label: 'Materialized Views', icon: 'matview' },
-  { type: 'sequences', label: 'Sequences', icon: 'sequence' },
-  { type: 'functions', label: 'Functions', icon: 'function' },
+interface ObjGroup {
+  type: string;
+  kind: string;
+  label: string;
+  loadable: boolean;
+  children?: ObjGroup[];
+}
+
+const DB_OBJECTS: ObjGroup[] = [
+  { type: 'casts', kind: 'casts', label: 'Casts', loadable: true },
+  { type: 'event_triggers', kind: 'event_triggers', label: 'Event Triggers', loadable: true },
+  { type: 'extensions', kind: 'extensions', label: 'Extensions', loadable: true },
+  { type: 'foreign_data_wrappers', kind: 'foreign_data_wrappers', label: 'Foreign Data Wrappers', loadable: true },
+  { type: 'languages', kind: 'languages', label: 'Languages', loadable: true },
+  { type: 'publications', kind: 'publications', label: 'Publications', loadable: true },
+  { type: 'subscriptions', kind: 'subscriptions', label: 'Subscriptions', loadable: true },
 ];
 
-const FOLDER_TYPES = [
-  { type: 'columns', label: 'Columns', icon: 'column' },
-  { type: 'indexes', label: 'Indexes', icon: 'index' },
-  { type: 'constraints', label: 'Constraints', icon: 'constraint' },
-  { type: 'triggers', label: 'Triggers', icon: 'trigger' },
+const SCHEMA_OBJECTS: ObjGroup[] = [
+  { type: 'aggregates', kind: 'aggregates', label: 'Aggregates', loadable: true },
+  { type: 'collations', kind: 'collations', label: 'Collations', loadable: true },
+  { type: 'domains', kind: 'domains', label: 'Domains', loadable: true },
+  { type: 'foreign_tables', kind: 'foreign_tables', label: 'Foreign Tables', loadable: true },
+  { type: 'fts_configurations', kind: 'fts_configurations', label: 'FTS Configurations', loadable: true },
+  { type: 'fts_dictionaries', kind: 'fts_dictionaries', label: 'FTS Dictionaries', loadable: true },
+  { type: 'fts_parsers', kind: 'fts_parsers', label: 'FTS Parsers', loadable: true },
+  { type: 'fts_templates', kind: 'fts_templates', label: 'FTS Templates', loadable: true },
+  { type: 'operators', kind: 'operators', label: 'Operators', loadable: true },
+  { type: 'synonyms', kind: 'synonyms', label: 'Synonyms', loadable: true },
+  { type: 'types', kind: 'types', label: 'Types', loadable: true },
 ];
+
+const CONSTRAINT_SUBGROUPS: ObjGroup[] = [
+  { type: 'constraints:check', kind: 'constraints:check', label: 'Check Constraints', loadable: true },
+  { type: 'constraints:fk', kind: 'constraints:fk', label: 'Foreign Keys', loadable: true },
+  { type: 'constraints:exclusion', kind: 'constraints:exclusion', label: 'Exclusion Constraints', loadable: true },
+  { type: 'constraints:index', kind: 'constraints:index', label: 'Index Constraints', loadable: true },
+];
+
+const TABLE_CHILDREN: ObjGroup[] = [
+  { type: 'columns', kind: 'columns', label: 'Columns', loadable: true },
+  {
+    type: 'constraints', kind: 'constraints', label: 'Constraints', loadable: true,
+    children: CONSTRAINT_SUBGROUPS,
+  },
+  { type: 'indexes', kind: 'indexes', label: 'Indexes', loadable: true },
+  { type: 'partitions', kind: 'partitions', label: 'Partitions', loadable: true },
+  { type: 'row_security_policies', kind: 'row_security_policies', label: 'Row Security Policies', loadable: true },
+  { type: 'rules', kind: 'rules', label: 'Rules', loadable: true },
+  { type: 'triggers', kind: 'triggers', label: 'Triggers', loadable: true },
+];
+
+const VIEW_CHILDREN: ObjGroup[] = [
+  { type: 'columns', kind: 'columns', label: 'Columns', loadable: true },
+  { type: 'indexes', kind: 'indexes', label: 'Indexes', loadable: true },
+  { type: 'triggers', kind: 'triggers', label: 'Triggers', loadable: true },
+  { type: 'rules', kind: 'rules', label: 'Rules', loadable: true },
+];
+
+const FOREIGN_TABLE_CHILDREN: ObjGroup[] = [
+  { type: 'columns', kind: 'columns', label: 'Columns', loadable: true },
+  {
+    type: 'constraints', kind: 'constraints', label: 'Constraints', loadable: true,
+    children: CONSTRAINT_SUBGROUPS,
+  },
+  { type: 'indexes', kind: 'indexes', label: 'Indexes', loadable: true },
+  { type: 'rules', kind: 'rules', label: 'Rules', loadable: true },
+  { type: 'triggers', kind: 'triggers', label: 'Triggers', loadable: true },
+];
+
+const LEAF_TYPES: Record<string, string> = {
+  columns: 'column',
+  indexes: 'index',
+  triggers: 'trigger',
+  rules: 'rule',
+  partitions: 'partition',
+  row_security_policies: 'rls_policy',
+  constraints: 'constraint',
+  'constraints:check': 'constraint',
+  'constraints:fk': 'constraint',
+  'constraints:exclusion': 'constraint',
+  'constraints:index': 'constraint',
+  casts: 'cast',
+  event_triggers: 'event_trigger',
+  extensions: 'extension',
+  foreign_data_wrappers: 'fdw',
+  languages: 'language',
+  publications: 'publication',
+  subscriptions: 'subscription',
+  aggregates: 'aggregate',
+  collations: 'collation',
+  domains: 'domain',
+  foreign_tables: 'foreign_table',
+  fts_configurations: 'fts_configuration',
+  fts_dictionaries: 'fts_dictionary',
+  fts_parsers: 'fts_parser',
+  fts_templates: 'fts_template',
+  operators: 'operator',
+  synonyms: 'synonym',
+  types: 'type',
+};
+
+const DATABASE_KINDS = new Set(DB_OBJECTS.map((g) => g.kind));
+const SCHEMA_KINDS = new Set(SCHEMA_OBJECTS.map((g) => g.kind));
 
 const TYPE_COLORS: Record<string, string> = {
   group: 'text-[#8a5a00]',
@@ -26,8 +117,35 @@ const TYPE_COLORS: Record<string, string> = {
   role: 'text-[#7a3aa0]',
   table: 'text-[#2a7a2a]',
   view: 'text-[#3a6ea5]',
+  matview: 'text-[#3a6ea5]',
   sequence: 'text-[#8a5a00]',
   function: 'text-[#a03a3a]',
+  tablespace: 'text-[#8a5a00]',
+  cast: 'text-[#5a7a2a]',
+  event_trigger: 'text-[#a03a3a]',
+  extension: 'text-[#3a6ea5]',
+  fdw: 'text-[#7a3aa0]',
+  language: 'text-[#8a5a00]',
+  publication: 'text-[#3a6ea5]',
+  subscription: 'text-[#a03a3a]',
+  aggregate: 'text-[#7a3aa0]',
+  collation: 'text-[#5a7a2a]',
+  domain: 'text-[#3a6ea5]',
+  foreign_table: 'text-[#a03a3a]',
+  fts_configuration: 'text-[#8a5a00]',
+  fts_dictionary: 'text-[#5a7a2a]',
+  fts_parser: 'text-[#7a3aa0]',
+  fts_template: 'text-[#3a6ea5]',
+  operator: 'text-[#a03a3a]',
+  synonym: 'text-[#8a5a00]',
+  type: 'text-[#5a7a2a]',
+  column: 'text-[#7a8694]',
+  index: 'text-[#3a6ea5]',
+  constraint: 'text-[#a03a3a]',
+  trigger: 'text-[#8a5a00]',
+  rule: 'text-[#7a3aa0]',
+  partition: 'text-[#5a7a2a]',
+  rls_policy: 'text-[#a03a3a]',
 };
 
 function typeColor(type: string): string {
@@ -38,18 +156,23 @@ interface BrowserPanelProps {
   servers: StudioServer[];
   groups: ServerGroup[];
   selectedKey: string | null;
+  refreshKey?: number;
   onSelect: (node: TreeNode) => void;
   onManageServer: (server: StudioServer) => void;
   onRefresh: () => void;
+  onAction: (action: ContextAction) => void;
 }
 
 interface BuiltNode extends TreeNode {
   data?: unknown;
 }
 
-export default function BrowserPanel({ servers, groups, selectedKey, onSelect, onManageServer, onRefresh }: BrowserPanelProps) {
+export default function BrowserPanel({ servers, groups, selectedKey, refreshKey = 0, onSelect, onManageServer, onRefresh, onAction }: BrowserPanelProps) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [cache, setCache] = useState<Record<string, BuiltNode[]>>({});
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  useEffect(() => { setCache({}); setOpen({}); }, [refreshKey]);
 
   const setChildren = useCallback((key: string, children: BuiltNode[]) =>
     setCache((c) => ({ ...c, [key]: children })), []);
@@ -57,7 +180,7 @@ export default function BrowserPanel({ servers, groups, selectedKey, onSelect, o
   useEffect(() => {
     let cancelled = false;
     fetchChildren(
-      { key: 'root', type: 'root', label: 'Servers', icon: 'server', loadable: true },
+      { key: 'root', type: 'root', label: 'Servers', icon: 'falcon', loadable: true },
       servers, groups, setChildren,
     )
       .then((built) => {
@@ -92,7 +215,7 @@ export default function BrowserPanel({ servers, groups, selectedKey, onSelect, o
 
   const refresh = async () => {
     onRefresh();
-    const root = { key: 'root', type: 'root', label: 'Servers', icon: 'server', loadable: true };
+    const root = { key: 'root', type: 'root', label: 'Servers', icon: 'falcon', loadable: true };
     try {
       const built = await fetchChildren(root, servers, groups, setChildren);
       setChildren('root', built);
@@ -104,6 +227,8 @@ export default function BrowserPanel({ servers, groups, selectedKey, onSelect, o
 
   const rootChildren = childrenOf('root');
 
+  const openContext = (menu: ContextMenuState) => setContextMenu(menu);
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-border bg-[#eef0f3] px-2 py-1.5 font-medium">
@@ -114,8 +239,8 @@ export default function BrowserPanel({ servers, groups, selectedKey, onSelect, o
       </div>
       <div className="flex-1 overflow-auto p-1">
         {!rootChildren.length && (
-          <button className="m-1.5 flex w-[calc(100%-12px)] cursor-pointer items-center justify-center gap-1.5 rounded border border-border bg-[#f7f7f7] p-1.5 hover:bg-[#ececec]" onClick={() => load({ key: 'root', type: 'root', label: 'Servers', icon: 'server', loadable: true })} title="Carregar árvore">
-            <Fa name="refresh" /> Carregar árvore
+          <button className="m-1.5 w-[calc(100%-12px)] cursor-pointer rounded border border-border bg-[#f7f7f7] p-1.5 hover:bg-[#ececec]" onClick={() => load({ key: 'root', type: 'root', label: 'Servers', icon: 'falcon', loadable: true })}>
+            Carregar árvore
           </button>
         )}
         {rootChildren.map((g) => (
@@ -129,13 +254,119 @@ export default function BrowserPanel({ servers, groups, selectedKey, onSelect, o
             selectedKey={selectedKey}
             onSelect={onSelect}
             onManageServer={onManageServer}
+            onOpenContext={openContext}
+            onAction={onAction}
           />
         ))}
         {!rootChildren.length && <div className="p-5 italic text-muted">Nenhum servidor.</div>}
         {rootChildren.length > 0 && !selectedKey && <div className="px-2.5 py-2 text-xs italic text-muted">Clique em um objeto para ver propriedades.</div>}
       </div>
+      {contextMenu && (
+        <ContextMenu menu={contextMenu} onClose={() => setContextMenu(null)} />
+      )}
     </div>
   );
+}
+
+function buildContextItems(node: BuiltNode, onAction: (a: ContextAction) => void): ContextItem[] {
+  const act = (kind: string) => () => onAction({ kind, serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, nodeType: node.type });
+
+  switch (node.type) {
+    case 'server': {
+      const s = node.data as StudioServer;
+      return [
+        { label: 'Connect Server', icon: 'sql', onClick: () => onAction({ kind: 'dashboard-server', serverId: node.serverId }) },
+        { label: 'Editar Servidor...', icon: 'edit', onClick: () => onAction({ kind: 'edit-server', serverId: node.serverId }) },
+        { label: 'New Database...', icon: 'database', onClick: () => onAction({ kind: 'create-database', serverId: node.serverId }) },
+        { label: 'Delete Server...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'delete-server', serverId: s.id, name: s.name }) },
+      ];
+    }
+    case 'group': {
+      const g = node.data as ServerGroup;
+      return [
+        { label: 'New Server...', icon: 'server', onClick: () => onAction({ kind: 'create-server', groupId: g.id }) },
+        { label: 'Rename Group...', icon: 'edit', onClick: () => onAction({ kind: 'rename-group', groupId: g.id, name: g.name }) },
+        { sep: true },
+        { label: 'Delete Group...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'delete-group', name: g.name }) },
+      ];
+    }
+    case 'database':
+      return [
+        { label: 'Dashboard', icon: 'chart', onClick: () => onAction({ kind: 'dashboard-database', serverId: node.serverId, database: node.database ?? undefined }) },
+        { label: 'New Schema...', icon: 'plus', onClick: () => onAction({ kind: 'create-schema', serverId: node.serverId, database: node.database ?? undefined }) },
+        { label: 'New Database...', icon: 'database', onClick: () => onAction({ kind: 'create-database', serverId: node.serverId }) },
+        { label: 'Grants...', icon: 'role', onClick: () => onAction({ kind: 'grants', serverId: node.serverId, database: node.database ?? undefined, name: node.database ?? undefined, nodeType: 'database' }) },
+        { sep: true },
+        { label: 'Vacuum', icon: 'refresh', onClick: () => onAction({ kind: 'vacuum-database', serverId: node.serverId, database: node.database ?? undefined }) },
+        { label: 'Vacuum Full + Analyze', icon: 'refresh', onClick: () => onAction({ kind: 'vacuum-database-full', serverId: node.serverId, database: node.database ?? undefined }) },
+        { label: 'Analyze', icon: 'refresh', onClick: () => onAction({ kind: 'analyze-database', serverId: node.serverId, database: node.database ?? undefined }) },
+        { sep: true },
+        { label: 'Backup...', icon: 'backup', onClick: () => onAction({ kind: 'backup', serverId: node.serverId, database: node.database ?? undefined }) },
+        { label: 'Restore...', icon: 'restore', onClick: () => onAction({ kind: 'restore', serverId: node.serverId, database: node.database ?? undefined }) },
+        { label: 'Drop Database...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-database', serverId: node.serverId, database: node.database ?? undefined }) },
+      ];
+    case 'schema':
+      return [
+        { label: 'New Table...', icon: 'table', onClick: () => onAction({ kind: 'create-table', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+        { label: 'New View...', icon: 'view', onClick: () => onAction({ kind: 'create-view', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+        { label: 'New Materialized View...', icon: 'matview', onClick: () => onAction({ kind: 'create-matview', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+        { label: 'New Sequence...', icon: 'sequence', onClick: () => onAction({ kind: 'create-sequence', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+        { label: 'New Function...', icon: 'function', onClick: () => onAction({ kind: 'create-function', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+        { label: 'Grants...', icon: 'role', onClick: () => onAction({ kind: 'grants', serverId: node.serverId, database: node.database ?? undefined, name: node.schema ?? undefined, nodeType: 'schema' }) },
+        { label: 'Drop Schema...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-schema', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+      ];
+    case 'table':
+      return [
+        { label: 'View/Edit Data', icon: 'table', onClick: () => onAction({ kind: 'view-data', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        { label: 'Count Rows', icon: 'chart', onClick: () => onAction({ kind: 'count-rows', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        { label: 'New Index...', icon: 'index', onClick: () => onAction({ kind: 'create-index', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        { label: 'Backup...', icon: 'backup', onClick: () => onAction({ kind: 'backup', serverId: node.serverId, database: node.database ?? undefined, name: node.name }) },
+        { label: 'Vacuum', icon: 'refresh', onClick: () => onAction({ kind: 'vacuum', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        { label: 'Reindex', icon: 'refresh', onClick: () => onAction({ kind: 'reindex', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        { label: 'Analyze', icon: 'refresh', onClick: () => onAction({ kind: 'analyze-table', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        { label: 'Truncate...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'truncate', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        { label: 'Drop Table...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-table', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+      ];
+    case 'matview':
+      return [
+        { label: 'Refresh', icon: 'refresh', onClick: () => onAction({ kind: 'refresh-matview', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        { label: 'Drop...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-matview', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+      ];
+    case 'view':
+      return [
+        { label: 'Drop View...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-view', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+      ];
+    case 'sequence':
+      return [
+        { label: 'Drop Sequence...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-sequence', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+      ];
+    case 'function':
+      return [
+        { label: 'Drop Function...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-function', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+      ];
+    case 'role':
+      return [
+        { label: 'Drop Role...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-role', serverId: node.serverId, name: node.name }) },
+      ];
+    case 'extension':
+      return [
+        { label: 'Drop Extension...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-extension', serverId: node.serverId, database: node.database ?? undefined, name: node.name }) },
+      ];
+    case 'index':
+      return [
+        { label: 'Drop Index...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-index', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+      ];
+    case 'extensions':
+      return [
+        { label: 'New Extension...', icon: 'plus', onClick: () => onAction({ kind: 'create-extension', serverId: node.serverId, database: node.database ?? undefined }) },
+      ];
+    case 'schemas':
+      return [
+        { label: 'New Schema...', icon: 'plus', onClick: () => onAction({ kind: 'create-schema', serverId: node.serverId, database: node.database ?? undefined }) },
+      ];
+    default:
+      return [{ label: 'Dashboard', icon: 'chart', onClick: act('dashboard') }];
+  }
 }
 
 interface TreeNodeProps {
@@ -147,16 +378,24 @@ interface TreeNodeProps {
   selectedKey: string | null;
   onSelect: (node: TreeNode) => void;
   onManageServer: (server: StudioServer) => void;
+  onOpenContext: (menu: ContextMenuState) => void;
+  onAction: (action: ContextAction) => void;
 }
 
-function TreeNode({ node, depth, isOpen, toggle, childrenOf, selectedKey, onSelect, onManageServer }: TreeNodeProps) {
+function TreeNode({ node, depth, isOpen, toggle, childrenOf, selectedKey, onSelect, onManageServer, onOpenContext, onAction }: TreeNodeProps) {
   const children = childrenOf(node.key);
   const open = isOpen(node.key);
   const selected = selectedKey === node.key;
 
   const handleContext = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (node.type === 'server' && node.data) onManageServer(node.data as StudioServer);
+    e.stopPropagation();
+    onOpenContext({
+      x: e.clientX,
+      y: e.clientY,
+      node,
+      items: buildContextItems(node, onAction),
+    });
   };
 
   return (
@@ -179,8 +418,8 @@ function TreeNode({ node, depth, isOpen, toggle, childrenOf, selectedKey, onSele
         <span className="truncate">{node.label}</span>
         {node.type === 'server' && !!node.data && (
           <span className="ml-auto hidden group-hover:inline-flex">
-            <button className="inline-flex cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-[11px] text-muted hover:text-pg-blue" title="Editar servidor" onClick={(e) => { e.stopPropagation(); onManageServer(node.data as StudioServer); }}>
-              <Fa name="edit" /> editar
+            <button className="cursor-pointer border-none bg-transparent p-0 text-[11px] text-muted hover:text-pg-blue" title="Editar servidor" onClick={(e) => { e.stopPropagation(); onManageServer(node.data as StudioServer); }}>
+              editar
             </button>
           </span>
         )}
@@ -198,6 +437,8 @@ function TreeNode({ node, depth, isOpen, toggle, childrenOf, selectedKey, onSele
               selectedKey={selectedKey}
               onSelect={onSelect}
               onManageServer={onManageServer}
+              onOpenContext={onOpenContext}
+              onAction={onAction}
             />
           ))}
           {!children.length && node.loadable && <div className="px-1.5 py-1 text-[13px] italic text-muted">(sem itens)</div>}
@@ -220,6 +461,25 @@ function node(partial: Partial<BuiltNode> & { key: string; type: string; label: 
     schema: partial.schema,
     name: partial.name,
   };
+}
+
+function folder(
+  n: BuiltNode,
+  g: ObjGroup,
+  parent: string,
+): BuiltNode {
+  return node({
+    key: `${n.key}:${g.type}`,
+    type: g.type,
+    label: g.label,
+    icon: g.kind,
+    loadable: g.loadable,
+    database: n.database,
+    schema: n.schema,
+    serverId: n.serverId,
+    name: n.name,
+    data: { parent, children: g.children },
+  });
 }
 
 async function fetchChildren(
@@ -252,27 +512,67 @@ async function fetchChildren(
 
     case 'server': {
       const s = n.data as StudioServer;
-      const dbs = await api.databases(s.id);
+      return [
+        node({ key: `server:${s.id}:databases`, type: 'databases', label: 'Databases', icon: 'database', loadable: true, serverId: s.id }),
+        node({ key: `server:${s.id}:roles`, type: 'roles', label: 'Roles/Login Roles', icon: 'roles', loadable: true, serverId: s.id }),
+        node({ key: `server:${s.id}:tablespaces`, type: 'tablespaces', label: 'Tablespaces', icon: 'tablespaces', loadable: true, serverId: s.id }),
+      ];
+    }
+
+    case 'databases': {
+      const s = n.serverId as number;
+      const dbs = await api.databases(s);
       return dbs.map((d) => node({
-        key: `db:${s.id}:${d.name}`,
+        key: `db:${s}:${d.name}`,
         type: 'database',
         label: d.name,
         icon: 'database',
         loadable: true,
         database: d.name,
-        serverId: s.id,
+        serverId: s,
         data: { server: s, database: d },
+      }));
+    }
+
+    case 'tablespaces': {
+      const s = n.serverId as number;
+      const items = await api.tablespaces(s);
+      return items.map((o) => node({
+        key: `${n.key}:${o.name}`,
+        type: 'tablespace',
+        label: o.name,
+        icon: 'tablespace',
+        serverId: s,
+        data: o,
+      }));
+    }
+
+    case 'roles': {
+      const s = n.serverId as number;
+      const roles = await api.roles(s);
+      return roles.map((r) => node({
+        key: `${n.key}:${r.name}`,
+        type: 'role',
+        label: r.name,
+        icon: 'role',
+        serverId: s,
+        data: r,
       }));
     }
 
     case 'database': {
       const s = n.serverId as number;
       const db = n.database as string;
+      const out: BuiltNode[] = DB_OBJECTS.map((g) => folder(n, g, 'database'));
+      out.push(node({ key: `db:${s}:${db}:schemas`, type: 'schemas', label: 'Schemas', icon: 'schema', loadable: true, database: db, serverId: s }));
+      return out;
+    }
+
+    case 'schemas': {
+      const s = n.serverId as number;
+      const db = n.database as string;
       const schemas = await api.schemas(s, db);
-      const out: BuiltNode[] = [
-        node({ key: `db:${s}:${db}:roles`, type: 'roles', label: 'Roles/Login Roles', icon: 'roles', loadable: true, database: db, serverId: s }),
-      ];
-      out.push(...schemas.map((sch) => node({
+      return schemas.map((sch) => node({
         key: `db:${s}:${db}:schema:${sch.name}`,
         type: 'schema',
         label: sch.name,
@@ -281,21 +581,6 @@ async function fetchChildren(
         database: db,
         schema: sch.name,
         serverId: s,
-      })));
-      return out;
-    }
-
-    case 'roles': {
-      const s = n.serverId as number;
-      const roles = await api.roles(s);
-      return roles.map((r) => node({
-        key: `db:${n.database}:${s}:role:${r.name}`,
-        type: 'role',
-        label: r.name,
-        icon: 'role',
-        database: n.database,
-        serverId: s,
-        data: r,
       }));
     }
 
@@ -303,16 +588,15 @@ async function fetchChildren(
       const s = n.serverId as number;
       const db = n.database as string;
       const schema = n.schema as string;
-      return OBJ_GROUPS.map((g) => node({
-        key: `db:${s}:${db}:schema:${schema}:${g.type}`,
-        type: g.type,
-        label: g.label,
-        icon: g.icon,
-        loadable: true,
-        database: db,
-        schema,
-        serverId: s,
-      }));
+      const out: BuiltNode[] = [
+        node({ key: `${n.key}:tables`, type: 'tables', label: 'Tables', icon: 'tables', loadable: true, database: db, schema, serverId: s }),
+        node({ key: `${n.key}:views`, type: 'views', label: 'Views', icon: 'views', loadable: true, database: db, schema, serverId: s }),
+        node({ key: `${n.key}:matviews`, type: 'matviews', label: 'Materialized Views', icon: 'matviews', loadable: true, database: db, schema, serverId: s }),
+        node({ key: `${n.key}:sequences`, type: 'sequences', label: 'Sequences', icon: 'sequences', loadable: true, database: db, schema, serverId: s }),
+        node({ key: `${n.key}:functions`, type: 'functions', label: 'Functions', icon: 'functions', loadable: true, database: db, schema, serverId: s }),
+      ];
+      out.push(...SCHEMA_OBJECTS.map((g) => folder(n, g, 'schema')));
+      return out;
     }
 
     case 'tables': return listObjects(n, '/tables', 'table');
@@ -321,31 +605,26 @@ async function fetchChildren(
     case 'sequences': return listObjects(n, '/sequences', 'sequence');
     case 'functions': return listObjects(n, '/functions', 'function');
 
-    case 'table': {
-      const built = FOLDER_TYPES.map((f) => node({
-        key: `${n.key}:${f.type}`,
-        type: f.type,
-        label: f.label,
-        icon: f.icon,
-        loadable: true,
-        database: n.database,
-        schema: n.schema,
-        serverId: n.serverId,
-        name: n.name,
-      }));
-      setChildren(n.key, built);
-      loadTableSub(n).catch((e) => console.error(e));
-      return built;
+    case 'table': return buildRelationChildren(n, TABLE_CHILDREN);
+    case 'view': return buildRelationChildren(n, VIEW_CHILDREN);
+    case 'matview': return buildRelationChildren(n, VIEW_CHILDREN);
+    case 'foreign_table': return buildRelationChildren(n, FOREIGN_TABLE_CHILDREN);
+
+    case 'constraints': {
+      const children = ((n.data as { children?: ObjGroup[] }) || {}).children || [];
+      return children.map((g) => folder(n, g, 'constraints'));
     }
 
-    case 'columns': return loadTableSub(n);
-    case 'indexes': return loadTableSub(n);
-    case 'constraints': return loadTableSub(n);
-    case 'triggers': return loadTableSub(n);
-
     default:
+      if (DATABASE_KINDS.has(n.type) || SCHEMA_KINDS.has(n.type) || LEAF_TYPES[n.type]) {
+        return loadCatalogObjects(n);
+      }
       return [];
   }
+}
+
+function buildRelationChildren(n: BuiltNode, groups: ObjGroup[]): BuiltNode[] {
+  return groups.map((g) => folder(n, g, n.type));
 }
 
 async function listObjects(n: BuiltNode, path: string, type: string): Promise<BuiltNode[]> {
@@ -361,7 +640,7 @@ async function listObjects(n: BuiltNode, path: string, type: string): Promise<Bu
     type,
     label: item.name,
     icon: iconMap[type] || type,
-    loadable: type === 'table',
+    loadable: type === 'table' || type === 'view' || type === 'matview' || type === 'foreign_table',
     database: db,
     schema,
     serverId: s,
@@ -370,53 +649,38 @@ async function listObjects(n: BuiltNode, path: string, type: string): Promise<Bu
   }));
 }
 
-async function loadTableSub(n: BuiltNode): Promise<BuiltNode[]> {
+async function loadCatalogObjects(n: BuiltNode): Promise<BuiltNode[]> {
   const s = n.serverId as number;
   const db = n.database as string;
   const schema = n.schema as string;
-  const table = n.name as string;
-  const detail = await api.tableDetail(s, db, schema, table);
+  const name = n.name as string;
+  const parent = ((n.data as { parent?: string }) || {}).parent || 'table';
+  const kind = n.type;
 
-  switch (n.type) {
-    case 'columns':
-      return detail.columns.map((c) => node({
-        key: `${n.key}:${c.name}`,
-        type: 'column',
-        label: c.name,
-        icon: 'column',
-        database: db, schema, serverId: s, name: table,
-        data: c,
-      }));
-    case 'indexes':
-      return detail.indexes.map((i) => node({
-        key: `${n.key}:${i.name}`,
-        type: 'index',
-        label: i.name,
-        icon: 'index',
-        database: db, schema, serverId: s, name: table,
-        data: i,
-      }));
-    case 'constraints':
-      return detail.constraints.map((c) => node({
-        key: `${n.key}:${c.name}`,
-        type: 'constraint',
-        label: c.name,
-        icon: 'constraint',
-        database: db, schema, serverId: s, name: table,
-        data: c,
-      }));
-    case 'triggers': {
-      const triggers = await api.triggers(s, db, schema, table);
-      return triggers.map((t) => node({
-        key: `${n.key}:${t.name}`,
-        type: 'trigger',
-        label: t.name,
-        icon: 'trigger',
-        database: db, schema, serverId: s, name: table,
-        data: t,
-      }));
-    }
-    default:
-      return [];
+  let items: CatalogObject[];
+  if (DATABASE_KINDS.has(kind)) {
+    items = await api.databaseObjects(s, db, kind);
+  } else if (SCHEMA_KINDS.has(kind)) {
+    items = await api.schemaObjects(s, db, schema, kind);
+  } else if (parent === 'view' || parent === 'matview') {
+    items = await api.viewObjects(s, db, schema, name, kind);
+  } else if (parent === 'foreign_table') {
+    items = await api.foreignTableObjects(s, db, schema, name, kind);
+  } else {
+    items = await api.tableObjects(s, db, schema, name, kind);
   }
+
+  const leaf = LEAF_TYPES[kind] || 'column';
+  return items.map((o) => node({
+    key: `${n.key}:${o.name}`,
+    type: leaf,
+    label: o.name,
+    icon: leaf,
+    loadable: leaf === 'foreign_table',
+    database: db,
+    schema,
+    serverId: s,
+    name: o.name,
+    data: o,
+  }));
 }

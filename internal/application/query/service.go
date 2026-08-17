@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"postgres-management-studio/internal/domain/connection"
 	"postgres-management-studio/internal/domain/query"
@@ -13,10 +14,11 @@ type Service struct {
 	servers server.Repository
 	repo    query.Repository
 	conn    connection.Provider
+	history query.HistoryRepository
 }
 
-func NewService(servers server.Repository, repo query.Repository, conn connection.Provider) *Service {
-	return &Service{servers: servers, repo: repo, conn: conn}
+func NewService(servers server.Repository, repo query.Repository, conn connection.Provider, history query.HistoryRepository) *Service {
+	return &Service{servers: servers, repo: repo, conn: conn, history: history}
 }
 
 func (s *Service) Execute(ctx context.Context, serverID int64, database, sql string) (*query.Result, error) {
@@ -40,11 +42,19 @@ func (s *Service) ExecuteBatch(ctx context.Context, serverID int64, database, sq
 		SSLMode:  svr.SSLMode,
 	})
 	if err != nil {
+		s.recordHistory(serverID, database, sql, false, err.Error())
 		return nil, fmt.Errorf("connect to database %q: %w", database, err)
 	}
 	defer q.Close()
 
-	return s.repo.ExecuteBatch(ctx, q, sql)
+	results, err := s.repo.ExecuteBatch(ctx, q, sql)
+	if err != nil {
+		s.recordHistory(serverID, database, sql, false, err.Error())
+		return nil, err
+	}
+
+	s.recordHistory(serverID, database, sql, true, "")
+	return results, nil
 }
 
 func (s *Service) Explain(ctx context.Context, serverID int64, database, sql string, analyze bool) (*query.Result, error) {
@@ -68,11 +78,33 @@ func (s *Service) ExplainBatch(ctx context.Context, serverID int64, database, sq
 		SSLMode:  svr.SSLMode,
 	})
 	if err != nil {
+		s.recordHistory(serverID, database, sql, false, err.Error())
 		return nil, fmt.Errorf("connect to database %q: %w", database, err)
 	}
 	defer q.Close()
 
-	return s.repo.ExplainBatch(ctx, q, sql, analyze)
+	results, err := s.repo.ExplainBatch(ctx, q, sql, analyze)
+	if err != nil {
+		s.recordHistory(serverID, database, sql, false, err.Error())
+		return nil, err
+	}
+
+	s.recordHistory(serverID, database, sql, true, "")
+	return results, nil
+}
+
+func (s *Service) History(ctx context.Context, limit int) ([]query.HistoryItem, error) {
+	if s.history == nil {
+		return []query.HistoryItem{}, nil
+	}
+	return s.history.List(ctx, limit)
+}
+
+func (s *Service) ClearHistory(ctx context.Context) error {
+	if s.history == nil {
+		return nil
+	}
+	return s.history.Clear(ctx)
 }
 
 func (s *Service) run(ctx context.Context, serverID int64, database, sql string, fn func(connection.Querier, string) (*query.Result, error)) (*query.Result, error) {
@@ -90,9 +122,31 @@ func (s *Service) run(ctx context.Context, serverID int64, database, sql string,
 		SSLMode:  svr.SSLMode,
 	})
 	if err != nil {
+		s.recordHistory(serverID, database, sql, false, err.Error())
 		return nil, fmt.Errorf("connect to database %q: %w", database, err)
 	}
 	defer q.Close()
 
-	return fn(q, sql)
+	result, err := fn(q, sql)
+	if err != nil {
+		s.recordHistory(serverID, database, sql, false, err.Error())
+		return nil, err
+	}
+
+	s.recordHistory(serverID, database, sql, true, "")
+	return result, nil
+}
+
+func (s *Service) recordHistory(serverID int64, database, sql string, success bool, errMsg string) {
+	if s.history == nil {
+		return
+	}
+	_ = s.history.Add(context.Background(), query.HistoryItem{
+		Query:     sql,
+		ServerID:  serverID,
+		Database:  database,
+		Success:   success,
+		Error:     errMsg,
+		CreatedAt: time.Now().UTC(),
+	})
 }

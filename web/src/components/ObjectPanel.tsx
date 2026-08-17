@@ -1,31 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Fa } from '../icons';
-import type { TreeNode } from '../types';
+import DataGrid from './DataGrid';
+import type { Dependency, Dependent, TreeNode } from '../types';
 
 const OBJECT_KINDS: Record<string, string> = {
   table: 'table', view: 'view', matview: 'matview', sequence: 'sequence', function: 'function',
+  index: 'index',
 };
+
+const DEPENDABLE_KINDS = new Set(['table', 'view', 'matview', 'sequence', 'function', 'index', 'schema', 'role']);
 
 export default function ObjectPanel({ node, kind }: { node: TreeNode; kind: string }) {
   if (kind === 'dashboard-server') return <ServerDashboard node={node} />;
   if (kind === 'dashboard-database') return <DatabaseDashboard node={node} />;
+  if (kind === 'search') return <SearchResults node={node} />;
   return <ObjectTabs node={node} />;
 }
 
-function TabBar({ tabs, active, onChange }: { tabs: { key: string; label: string; icon: string }[]; active: string; onChange: (k: string) => void }) {
+function TabBar({ tabs, active, onChange }: { tabs: { key: string; label: string }[]; active: string; onChange: (k: string) => void }) {
   return (
     <div className="flex shrink-0 border-t border-border bg-tab-bg">
       {tabs.map((t) => (
         <button
           key={t.key}
-          className={`inline-flex cursor-pointer items-center gap-1.5 border-none border-r border-border px-4 py-1.5 text-[13px] text-[#4a5560] hover:bg-[#d7dbe1] ${
+          className={`cursor-pointer border-none border-r border-border px-4 py-1.5 text-[13px] text-[#4a5560] hover:bg-[#d7dbe1] ${
             active === t.key ? 'border-t-2 border-pg-blue bg-panel-bg font-medium text-[#1f2937]' : ''
           }`}
           onClick={() => onChange(t.key)}
-          title={t.label}
         >
-          <Fa name={t.icon} />
           {t.label}
         </button>
       ))}
@@ -39,8 +42,10 @@ interface FetchState<T> {
   error: Error | null;
 }
 
-function useFetch<T>(fn: () => Promise<T>, deps: React.DependencyList): FetchState<T> {
+function useFetch<T>(fn: () => Promise<T>, deps: React.DependencyList): FetchState<T> & { refresh: () => void } {
   const [state, setState] = useState<FetchState<T>>({ loading: true, data: null, error: null });
+  const [tick, setTick] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
     setState({ loading: true, data: null, error: null });
@@ -49,18 +54,23 @@ function useFetch<T>(fn: () => Promise<T>, deps: React.DependencyList): FetchSta
       .catch((error: Error) => !cancelled && setState({ loading: false, data: null, error }));
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  return state;
+  }, [...deps, tick]);
+  return { ...state, refresh: () => setTick((t) => t + 1) };
 }
 
 function ObjectTabs({ node }: { node: TreeNode }) {
   const [tab, setTab] = useState('properties');
-  const tabs: { key: string; label: string; icon: string }[] = [{ key: 'properties', label: 'Properties', icon: 'properties' }];
+  const tabs: { key: string; label: string }[] = [{ key: 'properties', label: 'Properties' }];
   if (node.type === 'table') {
-    tabs.push({ key: 'sql', label: 'SQL', icon: 'sql' });
-    tabs.push({ key: 'statistics', label: 'Statistics', icon: 'statistics' });
+    tabs.push({ key: 'data', label: 'Data' });
+    tabs.push({ key: 'sql', label: 'SQL' });
+    tabs.push({ key: 'statistics', label: 'Statistics' });
   } else if (OBJECT_KINDS[node.type]) {
-    tabs.push({ key: 'sql', label: 'SQL', icon: 'sql' });
+    tabs.push({ key: 'sql', label: 'SQL' });
+  }
+  if (DEPENDABLE_KINDS.has(node.type)) {
+    tabs.push({ key: 'dependencies', label: 'Dependencies' });
+    tabs.push({ key: 'dependents', label: 'Dependents' });
   }
 
   return (
@@ -69,10 +79,17 @@ function ObjectTabs({ node }: { node: TreeNode }) {
         <span className="inline-flex shrink-0 text-[#3a6ea5]"><Fa name={node.icon} /></span>
         <span className="text-sm font-medium">{node.schema ? `${node.schema}.${node.name}` : node.name}</span>
       </div>
-      <div className="flex-1 overflow-auto p-3">
+      <div className="min-h-0 flex-1 overflow-auto p-3">
         {tab === 'properties' && <PropertiesView node={node} />}
+        {tab === 'data' && (
+          <div className="h-full">
+            <DataGrid serverId={node.serverId as number} database={node.database as string} schema={node.schema as string} table={node.name as string} />
+          </div>
+        )}
         {tab === 'sql' && <SqlView node={node} />}
         {tab === 'statistics' && <StatisticsView node={node} />}
+        {tab === 'dependencies' && <DependenciesView node={node} />}
+        {tab === 'dependents' && <DependentsView node={node} />}
       </div>
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </div>
@@ -103,7 +120,8 @@ function PropertiesView({ node }: { node: TreeNode }) {
   if (node.type === 'role') return keyValue(roleProps(node.data as Record<string, unknown>));
   if (node.type === 'sequence') return keyValue(seqProps(node.data as Record<string, unknown>));
   if (node.type === 'function') return keyValue(fnProps(node.data as Record<string, unknown>));
-  return keyValue({ name: node.name, type: node.type });
+  const detail = (node.data as { detail?: string } | undefined)?.detail;
+  return keyValue({ name: node.name, type: node.type, ...(detail ? { detail } : {}) });
 }
 
 function TableProperties({ node }: { node: TreeNode }) {
@@ -200,7 +218,8 @@ function ServerDashboard({ node }: { node: TreeNode }) {
       <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Databases</h4>
       <DataTable headers={['Name', 'Size']} rows={data.databases.map((d) => [d.name, d.size])} />
       <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Atividade (sessões)</h4>
-      <SessionsTable sessions={data.sessions} />
+      <SessionsTable sessions={data.sessions} serverId={node.serverId as number} />
+      {data.sessions.length > 0 && <DashboardExtras serverId={node.serverId as number} />}
     </div>
   );
 }
@@ -214,6 +233,9 @@ function DatabaseDashboard({ node }: { node: TreeNode }) {
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
   if (!data) return null;
 
+  const serverId = node.serverId as number;
+  const database = node.database as string;
+
   return (
     <div className="h-full overflow-auto p-3">
       <div className="mb-3.5 flex flex-wrap gap-2.5">
@@ -223,16 +245,101 @@ function DatabaseDashboard({ node }: { node: TreeNode }) {
         <StatCard label="Idle" value={data.idle} />
       </div>
       <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Atividade (sessões)</h4>
-      <SessionsTable sessions={data.sessions} />
+      <SessionsTable sessions={data.sessions} serverId={serverId} database={database} />
+      <DashboardExtras serverId={serverId} database={database} />
     </div>
   );
 }
 
-function SessionsTable({ sessions }: { sessions: { pid: number; database: string; user: string; state: string; query: string; duration: string }[] }) {
+function DashboardExtras({ serverId, database }: { serverId: number; database?: string }) {
+  const [tab, setTab] = useState<'locks' | 'settings'>('locks');
+  const locks = useFetch(() => api.locks(serverId, database || 'postgres'), [serverId, database]);
+  const settings = useFetch(() => api.settings(serverId, database || 'postgres'), [serverId, database]);
+
+  const terminate = async (pid: number) => {
+    try {
+      await api.terminateSession(serverId, database || 'postgres', pid);
+    } catch { /* ignore */ }
+    locks.refresh();
+  };
+
+  return (
+    <div className="mt-4 border-t border-border pt-2">
+      <div className="flex gap-1">
+        <button className={`cursor-pointer border-none border-r border-border px-3 py-1 text-[13px] hover:bg-[#d7dbe1] ${tab === 'locks' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('locks')}>
+          Locks
+        </button>
+        <button className={`cursor-pointer border-none border-r border-border px-3 py-1 text-[13px] hover:bg-[#d7dbe1] ${tab === 'settings' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('settings')}>
+          Configurações
+        </button>
+      </div>
+      <div className="mt-2">
+        {tab === 'locks' && (
+          locks.loading ? <div className="italic text-muted">Carregando...</div> :
+          locks.error ? <div className="text-danger">{locks.error.message}</div> :
+          <DataTable
+            headers={['PID', 'Database', 'User', 'Relation', 'Mode', 'Granted', 'Action']}
+            rows={(locks.data || []).map((l) => [
+              l.pid, l.database, l.user, l.relation, l.mode, l.granted ? 'yes' : 'no',
+              React.createElement('button', { className: 'cursor-pointer border-none bg-transparent text-pg-blue', onClick: () => terminate(l.pid), title: 'Terminar sessão' }, 'terminar'),
+            ])}
+          />
+        )}
+        {tab === 'settings' && (
+          settings.loading ? <div className="italic text-muted">Carregando...</div> :
+          settings.error ? <div className="text-danger">{settings.error.message}</div> :
+          <DataTable
+            headers={['Name', 'Value', 'Unit', 'Context', 'Description']}
+            rows={(settings.data || []).map((s) => [s.name, s.value, s.unit, s.context, s.description])}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SearchResults({ node }: { node: TreeNode }) {
+  const serverId = node.serverId as number;
+  const database = node.database as string;
+  const query = node.name || '';
+  const { loading, data, error } = useFetch(() => api.searchObjects(serverId, database, query), [node.key]);
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border-soft bg-[#f4f6f8] px-3 py-2">
+        <span className="inline-flex shrink-0 text-[#3a6ea5]"><Fa name="search" /></span>
+        <span className="text-sm font-medium">Busca: {query}</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-3">
+        {loading ? <div className="italic text-muted">Buscando...</div> :
+         error ? <div className="text-danger">{error.message}</div> :
+         !data || !data.length ? <div className="italic text-muted">Nenhum objeto encontrado.</div> :
+         <DataTable headers={['Schema', 'Name', 'Kind', 'Detail']} rows={(data || []).map((o) => [o.schema, o.name, o.kind, o.detail])} />}
+      </div>
+    </div>
+  );
+}
+
+function SessionsTable({ sessions, serverId, database }: { sessions: { pid: number; database: string; user: string; state: string; query: string; duration: string }[]; serverId?: number; database?: string }) {
+  const runAction = async (pid: number, terminate: boolean) => {
+    if (!serverId) return;
+    try {
+      if (terminate) await api.terminateSession(serverId, database || 'postgres', pid);
+      else await api.cancelSession(serverId, database || 'postgres', pid);
+    } catch { /* ignore */ }
+    window.setTimeout(() => window.dispatchEvent(new Event('pms-refresh-dashboard')), 500);
+  };
+
   return (
     <DataTable
-      headers={['PID', 'Database', 'User', 'State', 'Query', 'Duration']}
-      rows={(sessions || []).map((s) => [s.pid, s.database, s.user, s.state, s.query, s.duration])}
+      headers={serverId ? ['PID', 'Database', 'User', 'State', 'Query', 'Duration', 'Action'] : ['PID', 'Database', 'User', 'State', 'Query', 'Duration']}
+      rows={(sessions || []).map((s) => serverId
+        ? [s.pid, s.database, s.user, s.state, s.query, s.duration,
+           React.createElement('span', { className: 'flex gap-1' },
+             React.createElement('button', { className: 'cursor-pointer border-none bg-transparent text-pg-blue', onClick: () => runAction(s.pid, false), title: 'Cancelar query (pg_cancel_backend)' }, 'cancelar'),
+             React.createElement('button', { className: 'cursor-pointer border-none bg-transparent text-danger', onClick: () => runAction(s.pid, true), title: 'Terminar sessão' }, 'terminar'),
+           )]
+        : [s.pid, s.database, s.user, s.state, s.query, s.duration])}
     />
   );
 }
@@ -246,21 +353,56 @@ function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function DataTable({ headers, rows, withRowNumbers }: { headers: string[]; rows: unknown[][]; withRowNumbers?: boolean }) {
+export function DataTable({ headers, rows, withRowNumbers }: { headers: string[]; rows: React.ReactNode[][]; withRowNumbers?: boolean }) {
   return (
     <div className="max-h-full overflow-auto border border-border bg-panel-bg">
       <table className="border-collapse text-[13px]">
-        <thead><tr>{withRowNumbers && <th key="#line" className="sticky top-0 z-10 w-[44px] border border-border whitespace-nowrap bg-[#f0f2f5] px-2 py-1 text-right text-muted">#</th>}{headers.map((h) => <th key={h} className="sticky top-0 z-10 border border-border whitespace-nowrap bg-[#f0f2f5] px-2 py-1 text-left">{h}</th>)}</tr></thead>
+        <thead><tr>{withRowNumbers && <th className="sticky top-0 z-10 w-[44px] border border-border whitespace-nowrap bg-[#f0f2f5] px-2 py-1 text-right text-muted">#</th>}{headers.map((h) => <th key={h} className="sticky top-0 z-10 border border-border whitespace-nowrap bg-[#f0f2f5] px-2 py-1 text-left">{h}</th>)}</tr></thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} className="hover:bg-hover">
-              {withRowNumbers && <td className="whitespace-nowrap border border-[#e2e5e9] bg-[#fafafa] px-2 py-1 text-right font-mono text-muted">{i + 1}</td>}
-              {row.map((cell, j) => <td key={j} className="whitespace-nowrap border border-[#e2e5e9] px-2 py-1 font-mono">{cell === null || cell === undefined ? '' : String(cell)}</td>)}
-            </tr>
+            <tr key={i} className="hover:bg-hover">{withRowNumbers && <td className="whitespace-nowrap border border-[#e2e5e9] bg-[#fafafa] px-2 py-1 text-right font-mono text-muted">{i + 1}</td>}{row.map((cell, j) => <td key={j} className="whitespace-nowrap border border-[#e2e5e9] px-2 py-1 font-mono">{cell === null || cell === undefined ? '' : cell}</td>)}</tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function DependenciesView({ node }: { node: TreeNode }) {
+  const schema = (node.schema as string) || '';
+  const kind = node.type === 'schema' ? 'schema' : (OBJECT_KINDS[node.type] || node.type);
+  const name = (node.name as string) || '';
+  const { loading, data, error } = useFetch<Dependency[]>(
+    () => api.dependencies(node.serverId as number, node.database as string, schema, kind, name),
+    [node.key],
+  );
+  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (error) return <div className="p-5 text-danger">{error.message}</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">Nenhuma dependência.</div>;
+  return (
+    <DataTable
+      headers={['Type', 'Schema', 'Name', 'Owner', 'Dep Type']}
+      rows={data.map((d) => [d.type, d.schema || '-', d.name, d.owner || '-', d.dep_type])}
+    />
+  );
+}
+
+function DependentsView({ node }: { node: TreeNode }) {
+  const schema = (node.schema as string) || '';
+  const kind = node.type === 'schema' ? 'schema' : (OBJECT_KINDS[node.type] || node.type);
+  const name = (node.name as string) || '';
+  const { loading, data, error } = useFetch<Dependent[]>(
+    () => api.dependents(node.serverId as number, node.database as string, schema, kind, name),
+    [node.key],
+  );
+  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (error) return <div className="p-5 text-danger">{error.message}</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">Nenhum dependente.</div>;
+  return (
+    <DataTable
+      headers={['Type', 'Schema', 'Name', 'Owner', 'Dep Type']}
+      rows={data.map((d) => [d.type, d.schema || '-', d.name, d.owner || '-', d.dep_type])}
+    />
   );
 }
 

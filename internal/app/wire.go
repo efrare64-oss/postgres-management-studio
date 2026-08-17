@@ -9,6 +9,7 @@ import (
 	appgroup "postgres-management-studio/internal/application/group"
 	appquery "postgres-management-studio/internal/application/query"
 	appserver "postgres-management-studio/internal/application/server"
+	apptools "postgres-management-studio/internal/application/tools"
 	"postgres-management-studio/internal/config"
 	infradb "postgres-management-studio/internal/infrastructure/database"
 	httpserver "postgres-management-studio/internal/infrastructure/http"
@@ -39,13 +40,15 @@ func Wire(ctx context.Context, cfg *config.Config, frontend fs.FS) (*App, error)
 	groupRepo := persistence.NewGroupRepository(studioDB)
 	clusterRepo := remote.NewClusterRepository()
 	queryRepo := remote.NewQueryRepository()
+	queryHistoryRepo := persistence.NewQueryHistoryRepository(studioDB)
 
-	serverSvc := appserver.NewService(serverRepo, connManagement)
+	serverSvc := appserver.NewService(serverRepo, groupRepo, connManagement)
 	groupSvc := appgroup.NewService(groupRepo)
 	clusterSvc := appcluster.NewService(serverRepo, clusterRepo, connManagement)
-	querySvc := appquery.NewService(serverRepo, queryRepo, connManagement)
+	querySvc := appquery.NewService(serverRepo, queryRepo, connManagement, queryHistoryRepo)
+	toolsSvc := apptools.NewService(serverRepo, cfg)
 
-	srv := httpserver.New(serverSvc, clusterSvc, querySvc, groupSvc, frontend)
+	srv := httpserver.New(serverSvc, clusterSvc, querySvc, groupSvc, toolsSvc, frontend)
 
 	return &App{
 		Server: srv,

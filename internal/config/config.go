@@ -13,6 +13,7 @@ type Config struct {
 	HTTPPort    int
 	StudioDB    string
 	FrontendDir string
+	PGBinDir    string
 }
 
 func Load() (*Config, error) {
@@ -22,6 +23,7 @@ func Load() (*Config, error) {
 		HTTPPort:    8080,
 		StudioDB:    getEnv("STUDIO_DB", defaultStudioDBPath()),
 		FrontendDir: getEnv("FRONTEND_DIR", "./web/dist"),
+		PGBinDir:    getEnv("PG_BIN_DIR", ""),
 	}
 
 	if raw := os.Getenv("HTTP_PORT"); raw != "" {

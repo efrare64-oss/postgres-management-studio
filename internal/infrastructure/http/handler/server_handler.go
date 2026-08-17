@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -19,6 +22,8 @@ func NewServerHandler(service *appserver.Service) *ServerHandler {
 func (h *ServerHandler) Register(r *gin.RouterGroup) {
 	r.POST("/servers", h.create)
 	r.GET("/servers", h.list)
+	r.GET("/servers/export", h.export)
+	r.POST("/servers/import", h.importServers)
 	r.POST("/servers/test", h.testConnection)
 	r.GET("/servers/:id", h.get)
 	r.PUT("/servers/:id", h.update)
@@ -94,6 +99,69 @@ func (h *ServerHandler) delete(c *gin.Context) {
 		return
 	}
 	NoContent(c)
+}
+
+func (h *ServerHandler) export(c *gin.Context) {
+	out, err := h.service.Export(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.Header("Content-Disposition", "attachment; filename=servers.json")
+	OK(c, out)
+}
+
+func (h *ServerHandler) importServers(c *gin.Context) {
+	var inputs []appserver.ServerImportInput
+	decode := func(r io.Reader) error {
+		var raw json.RawMessage
+		if err := json.NewDecoder(r).Decode(&raw); err != nil {
+			return err
+		}
+		if len(raw) == 0 {
+			return nil
+		}
+		if raw[0] == '[' {
+			return json.Unmarshal(raw, &inputs)
+		}
+		var envelope struct {
+			Data json.RawMessage `json:"data"`
+		}
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			return err
+		}
+		if len(envelope.Data) == 0 {
+			return json.Unmarshal(raw, &inputs)
+		}
+		return json.Unmarshal(envelope.Data, &inputs)
+	}
+
+	if strings.HasPrefix(c.ContentType(), "multipart/form-data") {
+		file, _, err := c.Request.FormFile("file")
+		if err != nil {
+			Error(c, http.StatusBadRequest, "missing file: "+err.Error())
+			return
+		}
+		defer file.Close()
+		if err := decode(file); err != nil {
+			Error(c, http.StatusBadRequest, "invalid JSON: "+err.Error())
+			return
+		}
+	} else {
+		if err := decode(c.Request.Body); err != nil {
+			Error(c, http.StatusBadRequest, "invalid JSON: "+err.Error())
+			return
+		}
+	}
+
+	out, err := h.service.Import(c.Request.Context(), inputs)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	OK(c, out)
 }
 
 func (h *ServerHandler) testConnection(c *gin.Context) {

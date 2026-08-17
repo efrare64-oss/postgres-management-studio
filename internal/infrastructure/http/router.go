@@ -15,6 +15,7 @@ import (
 	appgroup "postgres-management-studio/internal/application/group"
 	appquery "postgres-management-studio/internal/application/query"
 	appserver "postgres-management-studio/internal/application/server"
+	apptools "postgres-management-studio/internal/application/tools"
 	"postgres-management-studio/internal/infrastructure/http/handler"
 	"postgres-management-studio/internal/infrastructure/http/middleware"
 )
@@ -23,7 +24,7 @@ type Server struct {
 	engine *gin.Engine
 }
 
-func New(serverSvc *appserver.Service, clusterSvc *appcluster.Service, querySvc *appquery.Service, groupSvc *appgroup.Service, frontend fs.FS) *Server {
+func New(serverSvc *appserver.Service, clusterSvc *appcluster.Service, querySvc *appquery.Service, groupSvc *appgroup.Service, toolsSvc *apptools.Service, frontend fs.FS) *Server {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery(), middleware.CORS())
 
@@ -31,6 +32,7 @@ func New(serverSvc *appserver.Service, clusterSvc *appcluster.Service, querySvc 
 	clusterH := handler.NewClusterHandler(clusterSvc)
 	queryH := handler.NewQueryHandler(querySvc)
 	groupH := handler.NewGroupHandler(groupSvc)
+	toolsH := handler.NewToolsHandler(toolsSvc)
 
 	api := r.Group("/api")
 	api.GET("/health", func(c *gin.Context) {
@@ -40,6 +42,7 @@ func New(serverSvc *appserver.Service, clusterSvc *appcluster.Service, querySvc 
 	clusterH.Register(api)
 	queryH.Register(api)
 	groupH.Register(api)
+	toolsH.Register(api)
 
 	if frontend != nil {
 		r.NoRoute(func(c *gin.Context) {

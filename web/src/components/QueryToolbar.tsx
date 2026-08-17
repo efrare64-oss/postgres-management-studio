@@ -12,6 +12,11 @@ interface QueryToolbarProps {
   onExecute: () => void;
   onExplain: () => void;
   onExplainAnalyze: () => void;
+  onFormat: () => void;
+  onGotoLine: () => void;
+  onToggleComment: () => void;
+  onUppercase: () => void;
+  onLowercase: () => void;
   onClear: () => void;
   onToggleHistory: () => void;
 }
@@ -27,6 +32,11 @@ export default function QueryToolbar({
   onExecute,
   onExplain,
   onExplainAnalyze,
+  onFormat,
+  onGotoLine,
+  onToggleComment,
+  onUppercase,
+  onLowercase,
   onClear,
   onToggleHistory,
 }: QueryToolbarProps) {
@@ -44,20 +54,35 @@ export default function QueryToolbar({
         </select>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        <button className="btn primary" disabled={running} onClick={onExecute} title="Executar consulta (F5)">
-          {running ? 'Executando...' : <><Fa name="play" /> Executar</>}
+        <button className="btn primary" disabled={running} onClick={onExecute} title="Executar">
+          <Fa name="sql" />
         </button>
-        <button className="btn" disabled={running} onClick={onExplain} title="EXPLAIN — plano de execução">
-          <Fa name="chart" /> EXPLAIN
+        <button className="btn" disabled={running} onClick={onExplain} title="EXPLAIN">
+          <Fa name="explain" />
         </button>
-        <button className="btn" disabled={running} onClick={onExplainAnalyze} title="EXPLAIN ANALYZE — plano com execução real">
-          <Fa name="chart" /> EXPLAIN ANALYZE
+        <button className="btn" disabled={running} onClick={onExplainAnalyze} title="EXPLAIN ANALYZE">
+          <Fa name="explain-analyze" />
         </button>
-        <button className="btn" onClick={onClear} title="Limpar editor e resultados">
-          <Fa name="clear" /> Limpar
+        <button className="btn" onClick={onFormat} title="Formatar SQL">
+          <Fa name="format" />
         </button>
-        <button className="btn" onClick={onToggleHistory} title="Mostrar/ocultar histórico de consultas">
-          <Fa name="history" /> Histórico
+        <button className="btn" onClick={onGotoLine} title="Ir para linha">
+          <Fa name="goto" />
+        </button>
+        <button className="btn" onClick={onToggleComment} title="Comentar/Descomentar">
+          <Fa name="comment" />
+        </button>
+        <button className="btn" onClick={onUppercase} title="Maiúsculas">
+          <Fa name="uppercase" />
+        </button>
+        <button className="btn" onClick={onLowercase} title="Minúsculas">
+          <Fa name="lowercase" />
+        </button>
+        <button className="btn" onClick={onClear} title="Limpar">
+          <Fa name="clear" />
+        </button>
+        <button className="btn" onClick={onToggleHistory} title="Histórico">
+          <Fa name="history" />
         </button>
       </div>
     </div>

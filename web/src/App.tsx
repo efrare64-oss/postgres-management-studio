@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import Header from './components/Header';
 import MenuBar from './components/MenuBar';
@@ -14,12 +14,30 @@ import ConnectDialog from './components/Dialogs/ConnectDialog';
 import GroupDialog from './components/Dialogs/GroupDialog';
 import CreateTableDialog from './components/Dialogs/CreateTableDialog';
 import RoleDialog from './components/Dialogs/RoleDialog';
+import DatabaseDialog from './components/Dialogs/DatabaseDialog';
+import SchemaDialog from './components/Dialogs/SchemaDialog';
+import ViewDialog from './components/Dialogs/ViewDialog';
+import SequenceDialog from './components/Dialogs/SequenceDialog';
+import FunctionDialog from './components/Dialogs/FunctionDialog';
+import IndexDialog from './components/Dialogs/IndexDialog';
+import ExtensionDialog from './components/Dialogs/ExtensionDialog';
+import GrantDialog from './components/Dialogs/GrantDialog';
+import ConfirmDialog from './components/Dialogs/ConfirmDialog';
 import AboutDialog from './components/Dialogs/AboutDialog';
-import type { AppTab, MenuDef, MenuId, ModalState, QueryContext, ServerGroup, StudioServer, ToolbarItem, TreeNode } from './types';
+import BackupDialog from './components/Dialogs/BackupDialog';
+import RestoreDialog from './components/Dialogs/RestoreDialog';
+import SearchPanel from './components/SearchPanel';
+import type { AppTab, ContextAction, MenuDef, MenuId, ModalState, QueryContext, ServerGroup, StudioServer, ToolbarItem, TreeNode } from './types';
+import { Fa } from './icons';
 
 let tabSeq = 1;
 
-const OPENABLE = ['table', 'view', 'matview', 'sequence', 'function', 'role', 'column', 'index', 'constraint', 'trigger'];
+const OPENABLE = [
+  'table', 'view', 'matview', 'sequence', 'function', 'role', 'column', 'index', 'constraint', 'trigger',
+  'tablespace', 'cast', 'event_trigger', 'extension', 'fdw', 'language', 'publication', 'subscription',
+  'aggregate', 'collation', 'domain', 'foreign_table', 'fts_configuration', 'fts_dictionary', 'fts_parser',
+  'fts_template', 'operator', 'synonym', 'type', 'rule', 'partition', 'rls_policy',
+];
 
 export default function App() {
   const [servers, setServers] = useState<StudioServer[]>([]);
@@ -33,38 +51,72 @@ export default function App() {
   const [status, setStatus] = useState('');
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [resizing, setResizing] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [queryServerId, setQueryServerId] = useState('');
+  const [queryDatabase, setQueryDatabase] = useState('');
   const [queryDatabases, setQueryDatabases] = useState<{ name: string; size: string }[]>([]);
   const [queryRunning, setQueryRunning] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const queryRefs = useRef<Record<string, QueryToolHandle>>({});
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchInitialQuery, setSearchInitialQuery] = useState('');
 
-  const activeQueryTab = useMemo(
-    () => tabs.find((t) => t.id === activeTab && t.kind === 'query') ?? null,
-    [tabs, activeTab],
-  );
-  const queryServerId = activeQueryTab?.context?.serverId != null ? String(activeQueryTab.context.serverId) : '';
-  const queryDatabase = activeQueryTab?.context?.database ?? '';
+  const activeQueryTab = tabs.find((t) => t.id === activeTab && t.kind === 'query');
 
-  const setQueryContext = (patch: Partial<QueryContext>) => {
-    if (!activeQueryTab) return;
-    setTabs((ts) => ts.map((t) => (t.id === activeQueryTab.id ? { ...t, context: { ...(t.context ?? { serverId: null, database: null }), ...patch } } : t)));
-  };
+  const searchContext = useMemo(() => {
+    const activeTabObj = tabs.find((t) => t.id === activeTab);
+    if (activeTabObj) {
+      if (activeTabObj.kind === 'query') {
+        const c = activeTabObj.context;
+        if (c?.serverId != null && c.database) return { serverId: c.serverId, database: c.database };
+      } else {
+        const n = activeTabObj.node;
+        if (n?.serverId != null && n.database) return { serverId: n.serverId, database: n.database };
+      }
+    }
+    return { serverId: context.serverId, database: context.database };
+  }, [tabs, activeTab, context]);
 
-  const updateTabContext = (tabId: string, patch: Partial<QueryContext>) => {
-    setTabs((ts) => ts.map((t) => (t.id === tabId && t.kind === 'query' ? { ...t, context: { ...(t.context ?? { serverId: null, database: null }), ...patch } } : t)));
+  const updateQueryTabContext = (tabId: string, context: QueryContext) => {
+    setTabs((ts) => ts.map((t) => (t.id === tabId && t.kind === 'query' ? { ...t, context } : t)));
   };
 
   useEffect(() => {
-    if (!queryServerId) { setQueryDatabases([]); return; }
+    if (!activeQueryTab) return;
+    const serverId = activeQueryTab.context?.serverId;
+    setQueryServerId(serverId != null ? String(serverId) : '');
+    setQueryDatabase(activeQueryTab.context?.database ?? '');
+  }, [activeQueryTab?.id, activeQueryTab?.context?.serverId, activeQueryTab?.context?.database]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!queryServerId) {
+      setQueryDatabases([]);
+      setQueryDatabase('');
+      return () => { cancelled = true; };
+    }
+
     api.databases(Number(queryServerId))
       .then((dbs) => {
+        if (cancelled) return;
         setQueryDatabases(dbs);
-        const names = dbs.map((d) => d.name);
-        if (!names.includes(queryDatabase)) setQueryContext({ database: names[0] || null });
+        const selected = queryDatabase && dbs.some((d) => d.name === queryDatabase)
+          ? queryDatabase
+          : dbs[0]?.name || '';
+        if (selected !== queryDatabase) {
+          setQueryDatabase(selected);
+          if (activeQueryTab) {
+            updateQueryTabContext(activeQueryTab.id, { serverId: Number(queryServerId), database: selected });
+          }
+        }
       })
-      .catch(() => setQueryDatabases([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryServerId, activeQueryTab?.id]);
+      .catch(() => {
+        if (!cancelled) setQueryDatabases([]);
+      });
+
+    return () => { cancelled = true; };
+  }, [queryServerId, queryDatabase, activeQueryTab]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -141,6 +193,24 @@ export default function App() {
     openTab({ id: `query:${tabSeq++}`, title: 'Query Tool', kind: 'query', context: ctx });
   };
 
+  const setActiveQueryServer = (serverId: string) => {
+    if (!activeQueryTab) return;
+    const nextServerId = serverId ? Number(serverId) : null;
+    const nextContext: QueryContext = {
+      serverId: nextServerId,
+      database: nextServerId === activeQueryTab.context?.serverId ? activeQueryTab.context?.database : null,
+    };
+    updateQueryTabContext(activeQueryTab.id, nextContext);
+    setQueryServerId(serverId);
+    setQueryDatabase(nextContext.database ?? '');
+  };
+
+  const setActiveQueryDatabase = (database: string) => {
+    if (!activeQueryTab) return;
+    updateQueryTabContext(activeQueryTab.id, { serverId: activeQueryTab.context?.serverId ?? null, database });
+    setQueryDatabase(database);
+  };
+
   const openDashboard = (which: 'server' | 'database') => {
     if (which === 'server' && context.serverId != null) {
       handleSelect({ key: `dash-server:${context.serverId}`, type: 'server', label: selectedServerName(), icon: 'server', loadable: false, serverId: context.serverId });
@@ -154,6 +224,280 @@ export default function App() {
     return s ? s.name : '';
   };
 
+  const handleAction = useCallback((action: ContextAction) => {
+    const { serverId, database, schema, name, nodeType } = action;
+    const refresh = () => {
+      loadData();
+      setRefreshKey((k) => k + 1);
+    };
+    switch (action.kind) {
+      case 'edit-server':
+        if (serverId != null) {
+          const s = servers.find((x) => x.id === serverId);
+          if (s) setModal({ type: 'connect', server: s });
+        }
+        break;
+      case 'create-server':
+        setModal({ type: 'connect', groupId: action.groupId ?? null });
+        break;
+      case 'rename-group':
+        if (action.groupId != null) {
+          const g = groups.find((x) => x.id === action.groupId);
+          if (g) setModal({ type: 'group', group: g });
+        }
+        break;
+      case 'delete-server':
+        if (serverId != null) {
+          setModal({
+            type: 'confirm', title: 'Deletar servidor', danger: true,
+            message: `Deseja realmente deletar o servidor "${name}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.deleteServer(serverId); refresh(); },
+          });
+        }
+        break;
+      case 'delete-group':
+        setModal({
+          type: 'confirm', title: 'Deletar grupo', danger: true,
+          message: `Deseja realmente deletar o grupo "${name}"?`,
+          confirmLabel: 'Deletar',
+          onConfirm: async () => {
+            const g = groups.find((x) => x.name === name);
+            if (g) await api.deleteGroup(g.id);
+            refresh();
+          },
+        });
+        break;
+      case 'dashboard-server':
+        if (serverId != null) {
+          handleSelect({ key: `dash-server:${serverId}`, type: 'server', label: servers.find((x) => x.id === serverId)?.name || String(serverId), icon: 'server', loadable: false, serverId });
+        }
+        break;
+      case 'dashboard-database':
+        if (serverId != null && database) {
+          handleSelect({ key: `dash-db:${serverId}:${database}`, type: 'database', label: database, icon: 'database', loadable: false, serverId, database });
+        }
+        break;
+      case 'create-database':
+        if (serverId != null) setModal({ type: 'database', serverId });
+        break;
+      case 'drop-database':
+        if (serverId != null && database) {
+          setModal({
+            type: 'confirm', title: 'Deletar database', danger: true,
+            message: `Deseja realmente deletar o database "${database}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.dropDatabase(serverId, database, true); refresh(); },
+          });
+        }
+        break;
+      case 'create-schema':
+        if (serverId != null && database) setModal({ type: 'schema', serverId, database });
+        break;
+      case 'drop-schema':
+        if (serverId != null && database && schema) {
+          setModal({
+            type: 'confirm', title: 'Deletar schema', danger: true,
+            message: `Deseja realmente deletar o schema "${schema}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.dropSchema(serverId, database, schema, true); refresh(); },
+          });
+        }
+        break;
+      case 'create-table':
+        if (serverId != null && database) {
+          setContext({ serverId, database: database ?? null, schema: schema ?? null });
+          setModal({ type: 'table' });
+        }
+        break;
+      case 'drop-table':
+        if (serverId != null && database && schema && name) {
+          setModal({
+            type: 'confirm', title: 'Deletar tabela', danger: true,
+            message: `Deseja realmente deletar a tabela "${schema}.${name}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.delete<void>(`/servers/${serverId}/databases/${encodeURIComponent(database)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(name)}`); refresh(); },
+          });
+        }
+        break;
+      case 'view-data':
+        if (serverId != null && database && schema && name) {
+          openTab({ id: `data:${serverId}:${database}:${schema}:${name}`, title: name, kind: 'object', node: { key: `data:${serverId}:${database}:${schema}:${name}`, type: 'table', label: name, icon: 'table', loadable: false, serverId, database, schema, name } });
+        }
+        break;
+      case 'truncate':
+        if (serverId != null && database && schema && name) {
+          setModal({
+            type: 'confirm', title: 'Truncate', danger: true,
+            message: `Deseja realmente truncar a tabela "${schema}.${name}"?`,
+            confirmLabel: 'Truncate',
+            onConfirm: async () => { await api.truncateTable(serverId, database, schema, name); refresh(); },
+          });
+        }
+        break;
+      case 'vacuum':
+        if (serverId != null && database && schema && name) {
+          setStatus(`VACUUM em ${schema}.${name}...`);
+          api.vacuumTable(serverId, database, schema, name).then(() => setStatus('VACUUM concluído')).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'reindex':
+        if (serverId != null && database && schema && name) {
+          setStatus(`REINDEX em ${schema}.${name}...`);
+          api.reindexTable(serverId, database, schema, name).then(() => setStatus('REINDEX concluído')).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'analyze-table':
+        if (serverId != null && database && schema && name) {
+          setStatus(`ANALYZE em ${schema}.${name}...`);
+          api.analyzeTable(serverId, database, schema, name).then(() => setStatus('ANALYZE concluído')).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'vacuum-database':
+        if (serverId != null && database) {
+          setStatus(`VACUUM no banco ${database}...`);
+          api.vacuumDatabase(serverId, database, false, false).then(() => setStatus('VACUUM no banco concluído')).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'vacuum-database-full':
+        if (serverId != null && database) {
+          setStatus(`VACUUM FULL + ANALYZE no banco ${database}...`);
+          api.vacuumDatabase(serverId, database, true, true).then(() => setStatus('VACUUM FULL + ANALYZE concluído')).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'analyze-database':
+        if (serverId != null && database) {
+          setStatus(`ANALYZE no banco ${database}...`);
+          api.analyzeDatabase(serverId, database).then(() => setStatus('ANALYZE no banco concluído')).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'count-rows':
+        if (serverId != null && database && schema && name) {
+          api.countTableRows(serverId, database, schema, name).then((r) => setStatus(`Linhas em ${schema}.${name}: ${r.count}`)).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'refresh-matview':
+        if (serverId != null && database && schema && name) {
+          api.refreshMatView(serverId, database, schema, name, true).then(() => setStatus(`Matview ${name} atualizada`)).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'create-view':
+        if (serverId != null && database && schema) setModal({ type: 'view', serverId, database, schema, kind: 'view' });
+        break;
+      case 'create-matview':
+        if (serverId != null && database && schema) setModal({ type: 'view', serverId, database, schema, kind: 'matview' });
+        break;
+      case 'create-sequence':
+        if (serverId != null && database && schema) setModal({ type: 'sequence', serverId, database, schema });
+        break;
+      case 'create-function':
+        if (serverId != null && database && schema) setModal({ type: 'function', serverId, database, schema });
+        break;
+      case 'create-index':
+        if (serverId != null && database && schema && name) setModal({ type: 'index', serverId, database, schema, table: name });
+        break;
+      case 'create-extension':
+        if (serverId != null && database) setModal({ type: 'extension', serverId, database });
+        break;
+      case 'drop-view':
+      case 'drop-matview':
+      case 'drop-sequence':
+      case 'drop-function':
+      case 'drop-index':
+      case 'drop-extension':
+        if (serverId != null && database && name) {
+          setModal({
+            type: 'confirm', title: 'Deletar objeto', danger: true,
+            message: `Deseja realmente deletar "${schema ? schema + '.' : ''}${name}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => {
+              const kinds: Record<string, string> = { 'drop-view': 'view', 'drop-matview': 'matview', 'drop-sequence': 'sequence', 'drop-function': 'function', 'drop-index': 'index', 'drop-extension': 'extension' };
+              const kind = kinds[action.kind];
+              const urlMap: Record<string, string> = {
+                view: `/servers/${serverId}/databases/${encodeURIComponent(database)}/schemas/${encodeURIComponent(schema || 'public')}/views/${encodeURIComponent(name)}?cascade=true`,
+                matview: `/servers/${serverId}/databases/${encodeURIComponent(database)}/schemas/${encodeURIComponent(schema || 'public')}/matviews/${encodeURIComponent(name)}?cascade=true`,
+                sequence: `/servers/${serverId}/databases/${encodeURIComponent(database)}/schemas/${encodeURIComponent(schema || 'public')}/sequences/${encodeURIComponent(name)}`,
+                function: `/servers/${serverId}/databases/${encodeURIComponent(database)}/schemas/${encodeURIComponent(schema || 'public')}/functions/${encodeURIComponent(name)}`,
+                index: `/servers/${serverId}/databases/${encodeURIComponent(database)}/schemas/${encodeURIComponent(schema || 'public')}/indexes/${encodeURIComponent(name)}`,
+                extension: `/servers/${serverId}/databases/${encodeURIComponent(database)}/extensions/${encodeURIComponent(name)}`,
+              };
+              await api.delete<void>(urlMap[kind]);
+              refresh();
+            },
+          });
+        }
+        break;
+      case 'drop-role':
+        if (serverId != null && name) {
+          setModal({
+            type: 'confirm', title: 'Deletar role', danger: true,
+            message: `Deseja realmente deletar o role "${name}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.dropRole(serverId, name); refresh(); },
+          });
+        }
+        break;
+      case 'grants':
+        if (serverId != null && database) {
+          setModal({ type: 'grants', serverId, database, objectKind: nodeType === 'schema' ? 'schema' : nodeType === 'database' ? 'database' : undefined, objectName: nodeType === 'schema' ? name : nodeType === 'database' ? database : undefined, schema });
+        }
+        break;
+      case 'backup':
+        if (serverId != null && database) {
+          setModal({ type: 'backup', serverId, database, table: nodeType === 'table' ? `${schema || 'public'}.${name}` : null });
+        }
+        break;
+      case 'restore':
+        if (serverId != null && database) {
+          setModal({ type: 'restore', serverId, database });
+        }
+        break;
+      case 'search':
+        setSearchInitialQuery(name ?? '');
+        setSearchOpen(true);
+        break;
+      default:
+        break;
+    }
+  }, [servers, groups, loadData, context]);
+
+  const doSearch = (q?: string) => {
+    setSearchInitialQuery(q ?? '');
+    setSearchOpen(true);
+  };
+
+  const exportServers = async () => {
+    try {
+      const servers = await api.exportServers();
+      const blob = new Blob([JSON.stringify(servers, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'servers.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setStatus((err as Error).message);
+    }
+  };
+
+  const importServers = async (file: File) => {
+    try {
+      await api.importServers(file);
+      await loadData();
+      setStatus('Servidores importados com sucesso.');
+    } catch (err) {
+      setStatus((err as Error).message);
+    }
+  };
+
+  const onImportInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    await importServers(file);
+  };
+
   const menuItems: MenuDef[] = useMemo(() => [
     {
       id: 'file',
@@ -161,6 +505,9 @@ export default function App() {
       items: [
         { label: 'New Server...', icon: 'server', onClick: () => setModal({ type: 'connect' }) },
         { label: 'New Server Group...', icon: 'group', onClick: () => setModal({ type: 'group' }) },
+        { sep: true },
+        { label: 'Export Servers...', icon: 'download', onClick: exportServers },
+        { label: 'Import Servers...', icon: 'upload', onClick: () => importInputRef.current?.click() },
         { sep: true },
         { label: 'Exit', icon: 'close', onClick: () => window.close() },
       ],
@@ -223,10 +570,19 @@ export default function App() {
             servers={servers}
             groups={groups}
             selectedKey={selectedKey}
+            refreshKey={refreshKey}
             onSelect={handleSelect}
             onManageServer={(srv) => setModal({ type: 'connect', server: srv })}
             onRefresh={loadData}
+            onAction={handleAction}
           />
+          <button
+            className="flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 border-t border-border bg-[#f4f6f8] px-2 text-muted hover:text-text"
+            onClick={() => doSearch()}
+            title="Buscar objetos na aba em foco"
+          >
+            <Fa name="search" />
+          </button>
         </aside>
         <div
           className={`w-[5px] shrink-0 cursor-col-resize border-r border-border bg-panel-bg ${resizing ? 'bg-pg-blue' : 'hover:bg-pg-blue'}`}
@@ -235,18 +591,30 @@ export default function App() {
         />
 
         <section className="flex min-w-0 flex-1 flex-col bg-pg-bg">
-          {tabs.some((t) => t.kind === 'query') && (
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={onImportInputChange}
+          />
+          {activeQueryTab && (
             <QueryToolbar
               servers={servers}
               serverId={queryServerId}
-              onServerChange={(id) => setQueryContext({ serverId: id ? Number(id) : null })}
+              onServerChange={setActiveQueryServer}
               databases={queryDatabases}
               database={queryDatabase}
-              onDatabaseChange={(db) => setQueryContext({ database: db })}
+              onDatabaseChange={setActiveQueryDatabase}
               running={queryRunning}
               onExecute={() => activeTab && queryRefs.current[activeTab]?.run('execute')}
               onExplain={() => activeTab && queryRefs.current[activeTab]?.run('explain')}
               onExplainAnalyze={() => activeTab && queryRefs.current[activeTab]?.run('explain-analyze')}
+              onFormat={() => activeTab && queryRefs.current[activeTab]?.format()}
+              onGotoLine={() => activeTab && queryRefs.current[activeTab]?.gotoLine()}
+              onToggleComment={() => activeTab && queryRefs.current[activeTab]?.toggleComment()}
+              onUppercase={() => activeTab && queryRefs.current[activeTab]?.uppercase()}
+              onLowercase={() => activeTab && queryRefs.current[activeTab]?.lowercase()}
               onClear={() => activeTab && queryRefs.current[activeTab]?.clear()}
               onToggleHistory={() => activeTab && queryRefs.current[activeTab]?.toggleHistory()}
             />
@@ -270,8 +638,8 @@ export default function App() {
                         database={t.context?.database ?? ''}
                         databases={queryDatabases}
                         running={queryRunning}
-                        onServerChange={(id) => updateTabContext(t.id, { serverId: id ? Number(id) : null })}
-                        onDatabaseChange={(db) => updateTabContext(t.id, { database: db })}
+                        onServerChange={setActiveQueryServer}
+                        onDatabaseChange={setActiveQueryDatabase}
                         onRunningChange={setQueryRunning}
                       />
                     ) : (
@@ -288,7 +656,7 @@ export default function App() {
       <StatusBar text={statusText} error={!!status} right={`${servers.length} servidor(es)`} />
 
       {modal?.type === 'connect' && (
-        <ConnectDialog server={modal.server} groups={groups} onSaved={() => { loadData(); }} onClose={() => setModal(null)} />
+        <ConnectDialog server={modal.server} groupId={modal.groupId ?? null} groups={groups} onSaved={() => { loadData(); }} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'group' && (
         <GroupDialog group={modal.group} onSaved={loadData} onClose={() => setModal(null)} />
@@ -302,6 +670,48 @@ export default function App() {
       {modal?.type === 'about' && (
         <AboutDialog onClose={() => setModal(null)} />
       )}
+      {modal?.type === 'database' && (
+        <DatabaseDialog serverId={modal.serverId} onSaved={() => { loadData(); setRefreshKey((k) => k + 1); }} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'schema' && (
+        <SchemaDialog serverId={modal.serverId} database={modal.database} onSaved={() => { loadData(); setRefreshKey((k) => k + 1); }} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'view' && (
+        <ViewDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} kind={modal.kind} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'sequence' && (
+        <SequenceDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'function' && (
+        <FunctionDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'index' && (
+        <IndexDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'extension' && (
+        <ExtensionDialog serverId={modal.serverId} database={modal.database} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'grants' && (
+        <GrantDialog serverId={modal.serverId} database={modal.database} objectKind={modal.objectKind} objectName={modal.objectName} schema={modal.schema} onSaved={() => { setStatus('Privilégios aplicados'); }} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'backup' && (
+        <BackupDialog serverId={modal.serverId} database={modal.database} table={modal.table} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'restore' && (
+        <RestoreDialog serverId={modal.serverId} database={modal.database} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'confirm' && (
+        <ConfirmDialog title={modal.title} message={modal.message} confirmLabel={modal.confirmLabel} danger={modal.danger} onConfirm={modal.onConfirm} onClose={() => setModal(null)} />
+      )}
+
+      <SearchPanel
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        serverId={searchContext.serverId}
+        database={searchContext.database}
+        initialQuery={searchInitialQuery}
+        onOpenObject={handleSelect}
+      />
     </div>
   );
 }

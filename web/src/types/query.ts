@@ -3,6 +3,7 @@ export interface QueryResult {
   rows: unknown[][];
   rows_affected: number;
   duration_ms: number;
+  error?: string;
 }
 
 export interface QueryBatch {
@@ -13,4 +14,14 @@ export interface QueryBatch {
 
 export interface SqlText {
   sql: string;
+}
+
+export interface HistoryItem {
+  id: number;
+  query: string;
+  server_id: number;
+  database: string;
+  success: boolean;
+  error: string;
+  created_at: string;
 }

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import Modal from './Modal';
 import { api } from '../../api';
-import { Fa } from '../../icons';
 import type { ServerGroup, StudioServer } from '../../types';
 
 const EMPTY: Omit<StudioServer, 'id'> = {
@@ -22,32 +21,37 @@ interface ConnectForm {
 
 interface ConnectDialogProps {
   server?: StudioServer | null;
+  groupId?: number | null;
   groups: ServerGroup[];
   onSaved: () => void;
   onClose: () => void;
 }
 
-export default function ConnectDialog({ server, groups, onSaved, onClose }: ConnectDialogProps) {
+export default function ConnectDialog({ server, groupId, groups, onSaved, onClose }: ConnectDialogProps) {
   const [form, setForm] = useState<ConnectForm>(() =>
     (server
       ? { ...EMPTY, ...server, password: server.password || '', server_group_id: server.server_group_id ?? '' }
-      : { ...EMPTY, server_group_id: '' }) as ConnectForm,
+      : { ...EMPTY, server_group_id: groupId ?? '' }) as ConnectForm,
   );
   const [busy, setBusy] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
+  const [testMessage, setTestMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const set = (k: keyof ConnectForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const buildPayload = (): Omit<StudioServer, 'id'> => ({
+    ...form,
+    port: Number(form.port),
+    server_group_id: form.server_group_id ? Number(form.server_group_id) : null,
+  });
+
   const submit = async () => {
     setError(null);
     setBusy(true);
     try {
-      const payload: Omit<StudioServer, 'id'> = {
-        ...form,
-        port: Number(form.port),
-        server_group_id: form.server_group_id ? Number(form.server_group_id) : null,
-      };
+      const payload = buildPayload();
       if (server) {
         await api.put(`/servers/${server.id}`, payload);
       } else {
@@ -59,6 +63,20 @@ export default function ConnectDialog({ server, groups, onSaved, onClose }: Conn
       setError((err as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const testConnection = async () => {
+    setError(null);
+    setTestMessage(null);
+    setTestBusy(true);
+    try {
+      await api.testServer(buildPayload());
+      setTestMessage('Conexão bem-sucedida.');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setTestBusy(false);
     }
   };
 
@@ -107,11 +125,15 @@ export default function ConnectDialog({ server, groups, onSaved, onClose }: Conn
             <option value="verify-full">verify-full</option>
           </select>
         </div>
+        {testMessage && <div className="form-success">{testMessage}</div>}
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose} title="Cancelar"><Fa name="cancel" /> Cancelar</button>
-          <button className="btn primary" disabled={busy || !form.name} onClick={submit} title="Salvar conexão">
-            {busy ? 'Salvando...' : <><Fa name="save" /> Salvar</>}
+          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" disabled={testBusy || busy || !form.name} onClick={testConnection}>
+            {testBusy ? 'Testando...' : 'Testar conexão'}
+          </button>
+          <button className="btn primary" disabled={busy || !form.name} onClick={submit}>
+            {busy ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
       </div>

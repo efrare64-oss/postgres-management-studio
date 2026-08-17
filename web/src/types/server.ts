@@ -15,6 +15,10 @@ export interface StudioServer {
   server_group_id: number | null;
 }
 
+export interface ServerExport extends StudioServer {
+  server_group_name?: string | null;
+}
+
 export interface DatabaseInfo {
   name: string;
   size: string;

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -34,6 +35,31 @@ type queryBatch struct {
 func (h *QueryHandler) Register(r *gin.RouterGroup) {
 	r.POST("/query", h.execute)
 	r.POST("/servers/:id/query", h.execute)
+	r.GET("/query/history", h.history)
+	r.DELETE("/query/history", h.clearHistory)
+}
+
+func (h *QueryHandler) history(c *gin.Context) {
+	limit := 50
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 500 {
+			limit = n
+		}
+	}
+	items, err := h.service.History(c.Request.Context(), limit)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	OK(c, items)
+}
+
+func (h *QueryHandler) clearHistory(c *gin.Context) {
+	if err := h.service.ClearHistory(c.Request.Context()); err != nil {
+		respondError(c, err)
+		return
+	}
+	NoContent(c)
 }
 
 func (h *QueryHandler) execute(c *gin.Context) {

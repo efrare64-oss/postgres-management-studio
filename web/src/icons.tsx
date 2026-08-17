@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react';
+import { FalconLogo } from './components/FalconLogo';
 
 const ICONS: Record<string, string> = {
+  falcon: '',
   server: 'fa fa-server',
   group: 'fa fa-users',
   database: 'fa fa-database',
@@ -16,6 +18,54 @@ const ICONS: Record<string, string> = {
   index: 'fa fa-sort-amount-asc',
   constraint: 'fa fa-link',
   trigger: 'fa fa-bolt',
+  tablespace: 'fa fa-database',
+  tablespaces: 'fa fa-database',
+  cast: 'fa fa-arrows-h',
+  casts: 'fa fa-arrows-h',
+  event_trigger: 'fa fa-flash',
+  event_triggers: 'fa fa-flash',
+  extension: 'fa fa-puzzle-piece',
+  extensions: 'fa fa-puzzle-piece',
+  fdw: 'fa fa-exchange',
+  foreign_data_wrappers: 'fa fa-exchange',
+  language: 'fa fa-language',
+  languages: 'fa fa-language',
+  publication: 'fa fa-book',
+  publications: 'fa fa-book',
+  subscription: 'fa fa-rss',
+  subscriptions: 'fa fa-rss',
+  aggregate: 'fa fa-cubes',
+  aggregates: 'fa fa-cubes',
+  collation: 'fa fa-text-width',
+  collations: 'fa fa-text-width',
+  domain: 'fa fa-square',
+  domains: 'fa fa-square',
+  foreign_table: 'fa fa-globe',
+  foreign_tables: 'fa fa-globe',
+  fts_configuration: 'fa fa-font',
+  fts_configurations: 'fa fa-font',
+  fts_dictionary: 'fa fa-book',
+  fts_dictionaries: 'fa fa-book',
+  fts_parser: 'fa fa-align-left',
+  fts_parsers: 'fa fa-align-left',
+  fts_template: 'fa fa-file-text-o',
+  fts_templates: 'fa fa-file-text-o',
+  operator: 'fa fa-asterisk',
+  operators: 'fa fa-asterisk',
+  synonym: 'fa fa-random',
+  synonyms: 'fa fa-random',
+  type: 'fa fa-tag',
+  types: 'fa fa-tag',
+  rule: 'fa fa-gears',
+  rules: 'fa fa-gears',
+  partition: 'fa fa-columns',
+  partitions: 'fa fa-columns',
+  rls_policy: 'fa fa-shield',
+  row_security_policies: 'fa fa-shield',
+  'constraints:check': 'fa fa-check-circle',
+  'constraints:fk': 'fa fa-key',
+  'constraints:exclusion': 'fa fa-ban',
+  'constraints:index': 'fa fa-lock',
 
   tables: 'fa fa-table',
   views: 'fa fa-eye',
@@ -35,6 +85,8 @@ const ICONS: Record<string, string> = {
   edit: 'fa fa-pencil',
   info: 'fa fa-info-circle',
   chart: 'fa fa-bar-chart-o',
+  backup: 'fa fa-cloud-download',
+  restore: 'fa fa-cloud-upload',
 
   play: 'fa fa-play',
   clear: 'fa fa-eraser',
@@ -46,6 +98,15 @@ const ICONS: Record<string, string> = {
   properties: 'fa fa-info-circle',
   statistics: 'fa fa-area-chart',
   object: 'fa fa-cube',
+  explain: 'fa fa-eye',
+  'explain-analyze': 'fa fa-flask',
+  format: 'fa fa-indent',
+  goto: 'fa fa-location-arrow',
+  comment: 'fa fa-commenting-o',
+  uppercase: 'fa fa-sort-alpha-asc',
+  lowercase: 'fa fa-sort-alpha-desc',
+  'replace-next': 'fa fa-arrow-down',
+  'replace-all': 'fa fa-fast-forward',
 };
 
 function iconClass(name: string): string {
@@ -53,5 +114,6 @@ function iconClass(name: string): string {
 }
 
 export function Fa({ name, className, style }: { name: string; className?: string; style?: CSSProperties }) {
+  if (name === 'falcon') return <FalconLogo className={className} />;
   return <i className={`${iconClass(name)}${className ? ' ' + className : ''}`} style={style} aria-hidden="true" />;
 }

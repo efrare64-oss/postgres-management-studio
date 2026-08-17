@@ -6,8 +6,8 @@
 
   --color-pg-blue: #326690;
   --color-pg-blue-dark: #2a567a;
-  --color-pg-header-top: #35586f;
-  --color-pg-header-bottom: #233e52;
+  --color-pg-header-top: #9e9289;
+  --color-pg-header-bottom: #8a7f77;
   --color-pg-bg: #eef1f4;
   --color-panel-bg: #ffffff;
   --color-border: #c7c7c7;
@@ -45,6 +45,9 @@
   }
   .btn.primary {
     @apply border-pg-blue bg-pg-blue text-white hover:bg-pg-blue-dark;
+  }
+  .btn.danger {
+    @apply border-[#c0392b] bg-[#e74c3c] text-white hover:bg-[#c0392b];
   }
   .btn.active {
     @apply bg-pg-blue text-white;

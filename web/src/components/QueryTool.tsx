@@ -2,20 +2,26 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'r
 import CodeMirror from '@uiw/react-codemirror';
 import { sql, PostgreSQL } from '@codemirror/lang-sql';
 import { autocompletion, closeBrackets, acceptCompletion, completionStatus } from '@codemirror/autocomplete';
-import { indentMore } from '@codemirror/commands';
+import { indentMore, toggleComment } from '@codemirror/commands';
 import { indentOnInput } from '@codemirror/language';
-import { highlightSelectionMatches } from '@codemirror/search';
+import { highlightSelectionMatches, gotoLine } from '@codemirror/search';
 import { EditorView, highlightActiveLine, keymap } from '@codemirror/view';
+import { EditorSelection } from '@codemirror/state';
 import type { SQLNamespace } from '@codemirror/lang-sql';
+import { format as formatSqlText } from 'sql-formatter';
 import { api } from '../api';
-import { Fa } from '../icons';
 import { DataTable } from './ObjectPanel';
-import type { CompletionTable, QueryBatch, QueryResult, StudioServer } from '../types';
+import type { CompletionTable, HistoryItem, QueryBatch, QueryResult, StudioServer } from '../types';
 
 export interface QueryToolHandle {
   run: (mode: 'execute' | 'explain' | 'explain-analyze') => void;
+  format: () => void;
   clear: () => void;
   toggleHistory: () => void;
+  gotoLine: () => void;
+  toggleComment: () => void;
+  uppercase: () => void;
+  lowercase: () => void;
 }
 
 interface QueryToolProps {
@@ -27,13 +33,6 @@ interface QueryToolProps {
   onServerChange: (id: string) => void;
   onDatabaseChange: (db: string) => void;
   onRunningChange: (v: boolean) => void;
-}
-
-interface HistoryItem {
-  query: string;
-  res: QueryBatch | null;
-  err: string | null;
-  at: Date;
 }
 
 const ssmsTheme = EditorView.theme({
@@ -90,6 +89,20 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [showResults, setShowResults] = useState(true);
+  const [editorView, setEditorView] = useState<EditorView | null>(null);
+
+  useEffect(() => {
+    api.queryHistory()
+      .then((items) => setHistory(items))
+      .catch(() => setHistory([]));
+  }, []);
+
+  const clearHistory = async () => {
+    try {
+      await api.clearQueryHistory();
+      setHistory([]);
+    } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     if (!serverId || !database) { setCompletion([]); return; }
@@ -107,32 +120,75 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
 
   const { schema, defaultSchema } = useMemo(() => buildSchema(completion), [completion]);
 
-  const extensions = useMemo(() => [
-    sql({ dialect: PostgreSQL, schema, defaultSchema, upperCaseKeywords: true }),
-    autocompletion(),
-    closeBrackets(),
-    indentOnInput(),
-    highlightActiveLine(),
-    highlightSelectionMatches(),
-    EditorView.lineWrapping,
-    ssmsTheme,
-    keymap.of([{
-      key: 'Tab',
-      run: (view) => {
-        if (completionStatus(view.state) === 'active' || completionStatus(view.state) === 'pending') {
-          return acceptCompletion(view);
-        }
-        return indentMore(view);
-      },
-    }]),
-    keymap.of([{
-      key: 'Shift-Tab',
-      run: (view) => {
-        if (completionStatus(view.state)) return acceptCompletion(view);
-        return indentMore(view);
-      },
-    }]),
-  ], [schema, defaultSchema]);
+  const pushMessage = (m: string) => setMessages((ms) => [...ms, m]);
+  const refreshHistory = () => {
+    api.queryHistory()
+      .then((items) => setHistory(items))
+      .catch(() => { /* ignore */ });
+  };
+
+  const formatSql = () => {
+    const sql = sqlText.trim();
+    if (!sql) return;
+    try {
+      const formatted = formatSqlText(sql, {
+        language: 'postgresql',
+        keywordCase: 'upper',
+        linesBetweenQueries: 1,
+      });
+      setSqlText(formatted.trim() + '\n');
+    } catch {
+      setSqlText(sql + '\n');
+    }
+  };
+
+  const openGotoLine = () => {
+    if (!editorView) return;
+    gotoLine(editorView);
+  };
+
+  const toggleCommentSelection = () => {
+    if (!editorView) return;
+    toggleComment(editorView);
+  };
+
+  const changeSelectionCase = (transform: (value: string) => string) => {
+    if (!editorView) return;
+    const tr = editorView.state.changeByRange((range) => {
+      if (range.empty) return { range };
+      const value = editorView.state.doc.sliceString(range.from, range.to);
+      const replaced = transform(value);
+      return {
+        changes: { from: range.from, to: range.to, insert: replaced },
+        range: EditorSelection.range(range.from, range.from + replaced.length),
+      };
+    });
+    editorView.dispatch(tr);
+  };
+
+  const uppercaseSelection = () => changeSelectionCase((v) => v.toUpperCase());
+  const lowercaseSelection = () => changeSelectionCase((v) => v.toLowerCase());
+
+  const downloadCsv = () => {
+    const csvResults = results.filter((r) => r.columns.length > 0);
+    if (csvResults.length === 0) return;
+    const escapeCell = (v: unknown) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const blocks = csvResults.map((r) => [
+      r.columns.map(escapeCell).join(','),
+      ...r.rows.map((row) => row.map(escapeCell).join(',')),
+    ]);
+    const lines = blocks.map((block) => block.join('\r\n')).join('\r\n\r\n');
+    const blob = new Blob([lines], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `query_result_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const run = async (mode: 'execute' | 'explain' | 'explain-analyze') => {
     if (!serverId) { setError('Selecione um servidor'); setTab('messages'); return; }
@@ -154,7 +210,6 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
       setResults(data.results);
       setShowResults(true);
       setTab(data.error ? 'messages' : 'results');
-      pushHistory(sqlText, data, data.error || null);
       if (data.results.length === 0 && !data.error) {
         pushMessage('Nenhum comando foi executado.');
       }
@@ -169,18 +224,15 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
         }
       });
       if (data.error) pushMessage(data.error);
+      refreshHistory();
     } catch (err) {
       setError((err as Error).message);
       setTab('messages');
-      pushHistory(sqlText, null, (err as Error).message);
+      refreshHistory();
     } finally {
       onRunningChange(false);
     }
   };
-
-  const clear = () => { setSqlText(''); setResults([]); setError(null); setMessages([]); };
-  const toggleHistory = () => setHistoryOpen((v) => !v);
-  useImperativeHandle(ref, () => ({ run, clear, toggleHistory }), [run, clear, toggleHistory]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -198,9 +250,53 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     return () => window.removeEventListener('keydown', onKey);
   }, [run]);
 
-  const pushMessage = (m: string) => setMessages((ms) => [...ms, m]);
-  const pushHistory = (q: string, res: QueryBatch | null, err: string | null) =>
-    setHistory((h) => [{ query: q, res, err, at: new Date() }, ...h].slice(0, 50));
+  const extensions = useMemo(() => [
+    sql({ dialect: PostgreSQL, schema, defaultSchema, upperCaseKeywords: true }),
+    autocompletion(),
+    closeBrackets(),
+    indentOnInput(),
+    highlightActiveLine(),
+    highlightSelectionMatches(),
+    EditorView.lineWrapping,
+    ssmsTheme,
+    keymap.of([{
+      key: 'Mod-Enter',
+      run: () => { run('execute'); return true; },
+    }, {
+      key: 'Mod-Shift-f',
+      run: () => { formatSql(); return true; },
+    }, {
+      key: 'Mod-/',
+      run: () => { toggleCommentSelection(); return true; },
+    }, {
+      key: 'Mod-Shift-U',
+      run: () => { uppercaseSelection(); return true; },
+    }, {
+      key: 'Mod-Shift-L',
+      run: () => { lowercaseSelection(); return true; },
+    }, {
+      key: 'Mod-Shift-g',
+      run: () => { openGotoLine(); return true; },
+    }, {
+      key: 'Tab',
+      run: (view) => {
+        if (completionStatus(view.state) === 'active' || completionStatus(view.state) === 'pending') {
+          return acceptCompletion(view);
+        }
+        return indentMore(view);
+      },
+    }, {
+      key: 'Shift-Tab',
+      run: (view) => {
+        if (completionStatus(view.state)) return acceptCompletion(view);
+        return indentMore(view);
+      },
+    }]),
+  ], [schema, defaultSchema, run, formatSql]);
+
+  const clear = () => { setSqlText(''); setResults([]); setError(null); setMessages([]); };
+  const toggleHistory = () => setHistoryOpen((v) => !v);
+  useImperativeHandle(ref, () => ({ run, format: formatSql, clear, toggleHistory, gotoLine: openGotoLine, toggleComment: toggleCommentSelection, uppercase: uppercaseSelection, lowercase: lowercaseSelection }), [run, formatSql, clear, toggleHistory, openGotoLine, toggleCommentSelection, uppercaseSelection, lowercaseSelection]);
 
   const totalRows = results.reduce((n, r) => n + r.rows.length, 0);
 
@@ -208,11 +304,16 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     <div className="flex h-full w-full flex-col">
       {historyOpen && (
         <div className="max-h-[180px] shrink-0 overflow-auto border-b border-border bg-[#fafafa]">
-          {history.length === 0 && <div className="p-5 italic text-muted">Nenhuma query executada.</div>}
-          {history.map((h, i) => (
-            <div className="flex items-center gap-2 border-b border-[#eee] px-2.5 py-1.5" key={i}>
+          <div className="flex items-center justify-between border-b border-[#eee] px-2.5 py-1">
+            <span className="text-xs font-medium text-muted">Histórico persistido</span>
+            <button className="cursor-pointer border-none bg-transparent text-xs text-danger" onClick={clearHistory}>Limpar histórico</button>
+          </div>
+          {history.length === 0 && <div className="p-5 italic text-muted">Nenhuma query no histórico.</div>}
+          {history.map((h) => (
+            <div className="flex items-center gap-2 border-b border-[#eee] px-2.5 py-1.5" key={h.id}>
               <button className="truncate cursor-pointer border-none bg-transparent text-left font-mono text-xs text-pg-blue" onClick={() => setSqlText(h.query)}>{h.query}</button>
-              <span className={`ml-auto text-xs whitespace-nowrap text-muted ${h.err ? 'text-danger' : ''}`}>{h.err || `${h.res?.results?.reduce((n, r) => n + r.rows.length + (r.columns.length ? 0 : r.rows_affected), 0) || 0} rows`}</span>
+              <span className="ml-auto shrink-0 text-xs text-muted">{h.database}</span>
+              <span className={`shrink-0 text-xs whitespace-nowrap ${h.success ? 'text-muted' : 'text-danger'}`}>{h.success ? 'ok' : 'erro'}</span>
             </div>
           ))}
         </div>
@@ -224,7 +325,9 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
           height={showResults ? '220px' : '100%'}
           theme="light"
           extensions={extensions}
+          basicSetup={{ searchKeymap: false }}
           onChange={(v) => setSqlText(v)}
+          onCreateEditor={(view) => setEditorView(view)}
           placeholder="SELECT * FROM public.tabela;"
         />
       </div>
@@ -263,14 +366,17 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
 
       {showResults && (
         <div className="flex shrink-0 border-t border-border bg-tab-bg">
-          <button className={`inline-flex cursor-pointer items-center gap-1.5 border-none border-r border-border px-4 py-1.5 text-[13px] text-[#4a5560] hover:bg-[#d7dbe1] ${tab === 'results' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('results')} title="Resultados">
-            <Fa name="results" />
+          <button className={`cursor-pointer border-none border-r border-border px-4 py-1.5 text-[13px] text-[#4a5560] hover:bg-[#d7dbe1] ${tab === 'results' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('results')}>
             Resultados {results.length > 0 ? `(${totalRows})` : ''}
           </button>
-          <button className={`inline-flex cursor-pointer items-center gap-1.5 border-none border-r border-border px-4 py-1.5 text-[13px] text-[#4a5560] hover:bg-[#d7dbe1] ${tab === 'messages' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('messages')} title="Mensagens">
-            <Fa name="messages" />
+          <button className={`cursor-pointer border-none border-r border-border px-4 py-1.5 text-[13px] text-[#4a5560] hover:bg-[#d7dbe1] ${tab === 'messages' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('messages')}>
             Mensagens {messages.length || error ? `(${messages.length + (error ? 1 : 0)})` : ''}
           </button>
+          {results.some((r) => r.columns.length > 0) && (
+            <button className="ml-auto cursor-pointer border-none border-l border-border px-4 py-1.5 text-[13px] text-pg-blue hover:bg-[#d7dbe1]" onClick={downloadCsv} title="Baixar resultados em CSV">
+              Baixar CSV
+            </button>
+          )}
         </div>
       )}
 

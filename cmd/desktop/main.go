@@ -206,9 +206,9 @@ func splashHTML(baseURL, fundo string) string {
     overflow: hidden;
     user-select: none;
   }
-  .content { text-align: center; background: rgba(20, 28, 36, 0.55); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 38px 58px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); backdrop-filter: blur(3px); }
+  .content { text-align: center; }
   .logo { margin-bottom: 18px; }
-  .logo img { border-radius: 24px; background: #ffffff; }
+  .logo img { background: transparent; }
   .title { font-size: 32px; font-weight: 600; letter-spacing: 0.5px; text-shadow: 0 2px 6px rgba(0,0,0,0.4); }
   .version { margin-top: 6px; font-size: 15px; color: #c8d6e2; }
   .bar { margin: 28px auto 0; height: 8px; width: 340px; background: #4a4a4a; border-radius: 4px; overflow: hidden; }
