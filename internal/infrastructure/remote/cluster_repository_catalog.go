@@ -426,7 +426,8 @@ func (r *ClusterRepository) relationObjects(ctx context.Context, q connection.Qu
 		args = []any{scope.Schema, scope.Table}
 	case "partitions":
 		query = `
-			SELECT child.relname, cn.nspname
+			SELECT child.relname,
+			       COALESCE(pg_get_expr(child.relpartbound, child.oid), '')
 			FROM pg_inherits i
 			JOIN pg_class parent ON parent.oid = i.inhparent
 			JOIN pg_namespace pn ON pn.oid = parent.relnamespace

@@ -7,3 +7,5 @@ studio.html
 .env
 *.log
 web/node_modules/
+linkedin/
+.opencode/

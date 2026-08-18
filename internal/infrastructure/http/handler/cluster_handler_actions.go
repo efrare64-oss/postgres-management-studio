@@ -20,10 +20,8 @@ func (h *ClusterHandler) registerActions(r *gin.RouterGroup) {
 	r.POST("/servers/:id/databases/:database/schemas/:schema/tables/:table/data/import", h.importCSV)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/tables/:table/count", h.countTableRows)
 	r.POST("/servers/:id/databases/:database/schemas/:schema/tables/:table/truncate", h.truncateTable)
-	r.POST("/servers/:id/databases/:database/schemas/:schema/tables/:table/vacuum", h.vacuumTable)
 	r.POST("/servers/:id/databases/:database/schemas/:schema/tables/:table/reindex", h.reindexTable)
 	r.POST("/servers/:id/databases/:database/schemas/:schema/tables/:table/analyze", h.analyzeTable)
-	r.POST("/servers/:id/databases/:database/vacuum", h.vacuumDatabase)
 	r.POST("/servers/:id/databases/:database/analyze", h.analyzeDatabase)
 	r.POST("/servers/:id/databases/:database/schemas/:schema/matviews/:matview/refresh", h.refreshMatView)
 
@@ -229,14 +227,10 @@ func (h *ClusterHandler) countTableRows(c *gin.Context) {
 // ---------------------------------------------------------------------------
 
 func (h *ClusterHandler) truncateTable(c *gin.Context) {
+	restartIdentity := c.DefaultQuery("restart_identity", "false") == "true"
+	cascade := c.DefaultQuery("cascade", "false") == "true"
 	h.runObjectAction(c, func() error {
-		return h.service.TruncateTable(c.Request.Context(), mustID(c), c.Param("database"), c.Param("schema"), c.Param("table"))
-	})
-}
-
-func (h *ClusterHandler) vacuumTable(c *gin.Context) {
-	h.runObjectAction(c, func() error {
-		return h.service.VacuumTable(c.Request.Context(), mustID(c), c.Param("database"), c.Param("schema"), c.Param("table"))
+		return h.service.TruncateTable(c.Request.Context(), mustID(c), c.Param("database"), c.Param("schema"), c.Param("table"), restartIdentity, cascade)
 	})
 }
 
@@ -249,14 +243,6 @@ func (h *ClusterHandler) reindexTable(c *gin.Context) {
 func (h *ClusterHandler) analyzeTable(c *gin.Context) {
 	h.runObjectAction(c, func() error {
 		return h.service.AnalyzeTable(c.Request.Context(), mustID(c), c.Param("database"), c.Param("schema"), c.Param("table"))
-	})
-}
-
-func (h *ClusterHandler) vacuumDatabase(c *gin.Context) {
-	full := c.DefaultQuery("full", "false") == "true"
-	analyze := c.DefaultQuery("analyze", "false") == "true"
-	h.runObjectAction(c, func() error {
-		return h.service.VacuumDatabase(c.Request.Context(), mustID(c), c.Param("database"), full, analyze)
 	})
 }
 

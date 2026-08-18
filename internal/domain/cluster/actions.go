@@ -85,11 +85,13 @@ type FunctionInput struct {
 }
 
 type IndexInput struct {
-	Name     string `json:"name"`
-	Columns  string `json:"columns"`
-	Unique   bool   `json:"unique"`
-	Method   string `json:"method"`
-	Where    string `json:"where"`
+	Name       string `json:"name"`
+	Columns    string `json:"columns"`
+	Unique     bool   `json:"unique"`
+	Method     string `json:"method"`
+	Where      string `json:"where"`
+	Tablespace string `json:"tablespace"`
+	Fillfactor int    `json:"fillfactor"`
 }
 
 type GrantInput struct {

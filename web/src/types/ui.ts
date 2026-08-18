@@ -20,6 +20,7 @@ export type ModalState =
   | { type: 'connect'; server?: StudioServer | null; groupId?: number | null }
   | { type: 'group'; group?: ServerGroup | null }
   | { type: 'table' }
+  | { type: 'table-edit'; serverId: number; database: string; schema: string; table: string }
   | { type: 'role'; role?: Role | null }
   | { type: 'database'; serverId: number }
   | { type: 'schema'; serverId: number; database: string }
@@ -27,6 +28,15 @@ export type ModalState =
   | { type: 'sequence'; serverId: number; database: string; schema: string }
   | { type: 'function'; serverId: number; database: string; schema: string }
   | { type: 'index'; serverId: number; database: string; schema: string; table: string }
+  | { type: 'index-edit'; serverId: number; database: string; schema: string; table: string; index: string }
+  | { type: 'column'; serverId: number; database: string; schema: string; table: string; column?: string | null }
+  | { type: 'constraint'; serverId: number; database: string; schema: string; table: string; constraint?: string | null }
+  | { type: 'trigger'; serverId: number; database: string; schema: string; table: string; trigger?: string | null }
+  | { type: 'policy'; serverId: number; database: string; schema: string; table: string; policy?: string | null }
+  | { type: 'rule'; serverId: number; database: string; schema: string; table: string; rule?: string | null }
+  | { type: 'partition-add'; serverId: number; database: string; schema: string; table: string }
+  | { type: 'partition-attach'; serverId: number; database: string; schema: string; table: string }
+  | { type: 'truncate'; serverId: number; database: string; schema: string; table: string }
   | { type: 'extension'; serverId: number; database: string }
   | { type: 'grants'; serverId: number; database: string; objectKind?: string; objectName?: string; schema?: string }
   | { type: 'backup'; serverId: number; database?: string | null; table?: string | null }
@@ -44,6 +54,7 @@ export interface ContextAction {
   database?: string;
   schema?: string;
   name?: string;
+  table?: string;
   nodeType?: string;
 }
 

@@ -65,6 +65,10 @@ function ObjectTabs({ node }: { node: TreeNode }) {
     tabs.push({ key: 'data', label: 'Data' });
     tabs.push({ key: 'sql', label: 'SQL' });
     tabs.push({ key: 'statistics', label: 'Statistics' });
+    tabs.push({ key: 'column-stats', label: 'Column Stats' });
+    tabs.push({ key: 'triggers', label: 'Triggers' });
+    tabs.push({ key: 'policies', label: 'Policies' });
+    tabs.push({ key: 'rules', label: 'Rules' });
   } else if (OBJECT_KINDS[node.type]) {
     tabs.push({ key: 'sql', label: 'SQL' });
   }
@@ -88,6 +92,10 @@ function ObjectTabs({ node }: { node: TreeNode }) {
         )}
         {tab === 'sql' && <SqlView node={node} />}
         {tab === 'statistics' && <StatisticsView node={node} />}
+        {tab === 'column-stats' && <ColumnStatsView node={node} />}
+        {tab === 'triggers' && <TriggersView node={node} />}
+        {tab === 'policies' && <PoliciesView node={node} />}
+        {tab === 'rules' && <RulesView node={node} />}
         {tab === 'dependencies' && <DependenciesView node={node} />}
         {tab === 'dependents' && <DependentsView node={node} />}
       </div>
@@ -129,6 +137,10 @@ function TableProperties({ node }: { node: TreeNode }) {
     () => api.tableDetail(node.serverId as number, node.database as string, node.schema as string, node.name as string),
     [node.key],
   );
+  const stats = useFetch(
+    () => api.tableStats(node.serverId as number, node.database as string, node.schema as string, node.name as string),
+    [node.key],
+  );
 
   if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
@@ -136,21 +148,50 @@ function TableProperties({ node }: { node: TreeNode }) {
 
   return (
     <div>
-      {keyValue({ name: data.table.name, schema: data.table.schema, owner: data.table.owner, size: data.table.size, comment: data.table.comment })}
+      {keyValue({
+        name: data.table.name,
+        schema: data.table.schema,
+        owner: data.table.owner,
+        size: data.table.size,
+        comment: data.table.comment,
+        row_estimate: data.table.row_estimate,
+        tablespace: data.table.tablespace,
+        fillfactor: data.table.fillfactor,
+        access_method: data.table.access_method,
+        persistence: data.table.persistence,
+        partition_key: data.table.partition_key,
+        has_oids: data.table.has_oids ? 'yes' : 'no',
+        indexes_size: data.table.indexes_size,
+        toast_size: data.table.toast_size,
+        storage_params: (data.table.storage_params || []).join(', '),
+        last_analyze: stats.data?.last_analyze || '-',
+        last_auto_analyze: stats.data?.last_auto_analyze || '-',
+        last_vacuum: stats.data?.last_vacuum || '-',
+        last_auto_vacuum: stats.data?.last_auto_vacuum || '-',
+      })}
       <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Columns</h4>
       <DataTable
-        headers={['#', 'Name', 'Type', 'Nullable', 'Default', 'PK']}
-        rows={data.columns.map((c) => [c.position, c.name, c.data_type, c.nullable ? 'yes' : 'no', c.default || '', c.is_primary ? 'yes' : ''])}
+        headers={['#', 'Name', 'Type', 'Nullable', 'Default', 'PK', 'Width', 'Precision', 'Scale', 'Storage', 'Collation']}
+        rows={data.columns.map((c) => [
+          c.position, c.name, c.data_type, c.nullable ? 'yes' : 'no', c.default || '', c.is_primary ? 'yes' : '',
+          c.width ?? '', c.precision ?? '', c.scale ?? '', c.storage, c.collation,
+        ])}
       />
       <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Indexes</h4>
       <DataTable
-        headers={['Name', 'Definition', 'Unique', 'Method']}
-        rows={data.indexes.map((i) => [i.name, i.columns, i.unique ? 'yes' : 'no', i.method])}
+        headers={['Name', 'Columns', 'Unique', 'Method', 'Predicate', 'Tablespace', 'Fillfactor', 'Storage Params', 'Clustered']}
+        rows={data.indexes.map((i) => [
+          i.name, i.columns.join(', '), i.unique ? 'yes' : 'no', i.method, i.predicate || '',
+          i.tablespace, i.fillfactor, i.storage_params.join(', '), i.clustered ? 'yes' : 'no',
+        ])}
       />
       <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Constraints</h4>
       <DataTable
-        headers={['Name', 'Type', 'Definition']}
-        rows={data.constraints.map((c) => [c.name, c.type, c.definition])}
+        headers={['Name', 'Type', 'Definition', 'Ref Table', 'Ref Columns', 'On Delete', 'On Update', 'Deferrable']}
+        rows={data.constraints.map((c) => [
+          c.name, c.type, c.definition, c.ref_table || '', (c.ref_columns || []).join(', '),
+          c.on_delete || '', c.on_update || '', c.deferrable ? 'yes' : 'no',
+        ])}
       />
     </div>
   );
@@ -193,7 +234,81 @@ function StatisticsView({ node }: { node: TreeNode }) {
         'Last auto analyze': data.last_auto_analyze || '-',
         'Last analyze': data.last_analyze || '-',
         'Last vacuum': data.last_vacuum || '-',
+        'Last auto vacuum': data.last_auto_vacuum || '-',
       })}
+    />
+  );
+}
+
+function ColumnStatsView({ node }: { node: TreeNode }) {
+  const { loading, data, error } = useFetch(
+    () => api.columnStats(node.serverId as number, node.database as string, node.schema as string, node.name as string),
+    [node.key],
+  );
+  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (error) return <div className="p-5 text-danger">{error.message}</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">Sem estatísticas (execute ANALYZE na tabela).</div>;
+  return (
+    <DataTable
+      headers={['Column', 'Null frac', 'Avg width', 'N distinct', 'Correlation', 'Most common values', 'Most common freqs', 'Histogram bounds']}
+      rows={data.map((c) => [
+        c.column,
+        c.null_frac.toFixed(3),
+        c.avg_width,
+        c.n_distinct,
+        c.correlation.toFixed(3),
+        c.most_common_vals.slice(0, 10).join(', '),
+        c.most_common_freqs.slice(0, 10).map((f) => f.toFixed(3)).join(', '),
+        c.histogram_bounds.slice(0, 10).join(', '),
+      ])}
+    />
+  );
+}
+
+function TriggersView({ node }: { node: TreeNode }) {
+  const { loading, data, error } = useFetch(
+    () => api.triggers(node.serverId as number, node.database as string, node.schema as string, node.name as string),
+    [node.key],
+  );
+  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (error) return <div className="p-5 text-danger">{error.message}</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">Nenhum trigger.</div>;
+  return (
+    <DataTable
+      headers={['Name', 'Table', 'Timing', 'Events', 'Function', 'Enabled', 'Definition']}
+      rows={data.map((t) => [t.name, t.table, t.timing, t.events, t.function, t.enabled, t.definition])}
+    />
+  );
+}
+
+function PoliciesView({ node }: { node: TreeNode }) {
+  const { loading, data, error } = useFetch(
+    () => api.policies(node.serverId as number, node.database as string, node.schema as string, node.name as string),
+    [node.key],
+  );
+  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (error) return <div className="p-5 text-danger">{error.message}</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">Nenhuma policy de row security.</div>;
+  return (
+    <DataTable
+      headers={['Name', 'Command', 'Permissive', 'Roles', 'Using', 'With Check']}
+      rows={data.map((p) => [p.name, p.command, p.permissive ? 'yes' : 'no', p.roles.join(', ') || 'PUBLIC', p.using, p.with_check])}
+    />
+  );
+}
+
+function RulesView({ node }: { node: TreeNode }) {
+  const { loading, data, error } = useFetch(
+    () => api.rules(node.serverId as number, node.database as string, node.schema as string, node.name as string),
+    [node.key],
+  );
+  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (error) return <div className="p-5 text-danger">{error.message}</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">Nenhuma rule.</div>;
+  return (
+    <DataTable
+      headers={['Name', 'Event', 'Instead', 'Where', 'Action']}
+      rows={data.map((r) => [r.name, r.event, r.instead ? 'yes' : 'no', r.where, r.action])}
     />
   );
 }
@@ -407,13 +522,26 @@ function DependentsView({ node }: { node: TreeNode }) {
 }
 
 function columnProps(c: Record<string, unknown>) {
-  return { name: c.name, type: c.data_type, nullable: c.nullable ? 'yes' : 'no', default: c.default || '', primary_key: c.is_primary ? 'yes' : 'no', position: c.position };
+  return {
+    name: c.name, type: c.data_type, nullable: c.nullable ? 'yes' : 'no', default: c.default || '',
+    primary_key: c.is_primary ? 'yes' : 'no', position: c.position, width: c.width ?? '',
+    precision: c.precision ?? '', scale: c.scale ?? '', storage: c.storage || '', collation: c.collation || '',
+  };
 }
 function indexProps(i: Record<string, unknown>) {
-  return { name: i.name, unique: i.unique ? 'yes' : 'no', method: i.method, definition: i.columns };
+  return {
+    name: i.name, columns: Array.isArray(i.columns) ? (i.columns as unknown[]).join(', ') : (i.columns ?? ''),
+    unique: i.unique ? 'yes' : 'no', method: i.method || '', predicate: i.predicate || '',
+    tablespace: i.tablespace || '', fillfactor: i.fillfactor ?? '',
+    storage_params: Array.isArray(i.storage_params) ? (i.storage_params as unknown[]).join(', ') : '', clustered: i.clustered ? 'yes' : 'no',
+  };
 }
 function constraintProps(c: Record<string, unknown>) {
-  return { name: c.name, type: c.type, definition: c.definition };
+  return {
+    name: c.name, type: c.type, definition: c.definition, ref_table: c.ref_table || '',
+    ref_columns: Array.isArray(c.ref_columns) ? (c.ref_columns as unknown[]).join(', ') : '', on_delete: c.on_delete || '',
+    on_update: c.on_update || '', deferrable: c.deferrable ? 'yes' : 'no',
+  };
 }
 function triggerProps(t: Record<string, unknown>) {
   return { name: t.name, table: t.table, timing: t.timing, events: t.events, function: t.function, enabled: t.enabled };

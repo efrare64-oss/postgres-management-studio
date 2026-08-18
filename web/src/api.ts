@@ -1,8 +1,8 @@
 import type {
-  ActionResult, BackupOptions, CatalogObject, CompletionTable, CountResult, CSVImportResult, DataSaveResult, DatabaseDashboard,
-  DatabaseInfo, Dependency, Dependent, FunctionInput, GrantInput, HistoryItem, IndexInput, Lock, QueryBatch,
-  RestoreOptions, Role, SchemaInfo, SearchObject, SequenceInput, ServerDashboard, Setting, SqlText, StudioServer,
-  ServerGroup, ServerExport, TableData, TableDataSave, TableDetail, TableStats, ToolBinary, Trigger,
+  ActionResult, AddColumnInput, AlterColumnInput, BackupOptions, CatalogObject, ColumnStat, CompletionTable, ConstraintInput, CountResult, CSVImportResult, DataSaveResult, DatabaseDashboard,
+  DatabaseInfo, Dependency, Dependent, FunctionInput, GrantInput, HistoryItem, IndexInput, Lock, Policy, PolicyInput, QueryBatch,
+  RestoreOptions, Role, Rule, RuleInput, SchemaInfo, SearchObject, SequenceInput, ServerDashboard, Setting, SqlText, StudioServer,
+  ServerGroup, ServerExport, TableData, TableDataSave, TableDetail, TableStats, ToolBinary, Trigger, TriggerInput,
 } from './types';
 
 interface ApiEnvelope {
@@ -80,6 +80,8 @@ export const api = {
     api.get<Trigger[]>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/triggers`),
   tableStats: (serverId: number, db: string, schema: string, table: string) =>
     api.get<TableStats>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/statistics`),
+  columnStats: (serverId: number, db: string, schema: string, table: string) =>
+    api.get<ColumnStat[]>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/column-stats`),
 
   tableData: (serverId: number, db: string, schema: string, table: string, limit = 100, offset = 0) =>
     api.get<TableData>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/data?limit=${limit}&offset=${offset}`),
@@ -99,16 +101,20 @@ export const api = {
   },
   countTableRows: (serverId: number, db: string, schema: string, table: string) =>
     api.get<CountResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/count`),
-  truncateTable: (serverId: number, db: string, schema: string, table: string) =>
-    api.post<ActionResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/truncate`),
-  vacuumTable: (serverId: number, db: string, schema: string, table: string) =>
-    api.post<ActionResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/vacuum`),
+  truncateTable: (serverId: number, db: string, schema: string, table: string, restartIdentity = false, cascade = false) =>
+    api.post<ActionResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/truncate?restart_identity=${restartIdentity}&cascade=${cascade}`),
   reindexTable: (serverId: number, db: string, schema: string, table: string) =>
     api.post<ActionResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/reindex`),
+  reindexIndex: (serverId: number, db: string, schema: string, index: string) =>
+    api.post<ActionResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/indexes/${encodeURIComponent(index)}/reindex`),
+  addPartition: (serverId: number, db: string, schema: string, table: string, name: string, bounds: string) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/partitions`, { name, bounds }),
+  attachPartition: (serverId: number, db: string, schema: string, table: string, partition: string, bounds: string) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/partitions/attach`, { partition, bounds }),
+  detachPartition: (serverId: number, db: string, schema: string, table: string, partition: string) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/partitions/${encodeURIComponent(partition)}/detach`),
   analyzeTable: (serverId: number, db: string, schema: string, table: string) =>
     api.post<ActionResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/analyze`),
-  vacuumDatabase: (serverId: number, db: string, full = false, analyze = false) =>
-    api.post<ActionResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/vacuum?full=${full}&analyze=${analyze}`),
   analyzeDatabase: (serverId: number, db: string) =>
     api.post<ActionResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/analyze`),
   refreshMatView: (serverId: number, db: string, schema: string, matview: string, withData: boolean) =>
@@ -132,6 +138,53 @@ export const api = {
     api.delete<void>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/functions/${encodeURIComponent(name)}`),
   createIndex: (serverId: number, db: string, schema: string, table: string, index: IndexInput) =>
     api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/indexes`, index),
+  replaceIndex: (serverId: number, db: string, schema: string, table: string, index: string, input: IndexInput) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/indexes/${encodeURIComponent(index)}`, input),
+
+  addColumn: (serverId: number, db: string, schema: string, table: string, input: AddColumnInput) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/columns`, input),
+  alterColumn: (serverId: number, db: string, schema: string, table: string, column: string, input: AlterColumnInput) =>
+    api.patch(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/columns/${encodeURIComponent(column)}`, input),
+  dropColumn: (serverId: number, db: string, schema: string, table: string, column: string, cascade: boolean) =>
+    api.delete<void>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/columns/${encodeURIComponent(column)}?cascade=${cascade}`),
+
+  createConstraint: (serverId: number, db: string, schema: string, table: string, input: ConstraintInput) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/constraints`, input),
+  alterConstraint: (serverId: number, db: string, schema: string, table: string, constraint: string, input: ConstraintInput) =>
+    api.patch(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/constraints/${encodeURIComponent(constraint)}`, input),
+  dropConstraint: (serverId: number, db: string, schema: string, table: string, constraint: string, cascade: boolean) =>
+    api.delete<void>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/constraints/${encodeURIComponent(constraint)}?cascade=${cascade}`),
+
+  createTrigger: (serverId: number, db: string, schema: string, table: string, input: TriggerInput) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/triggers`, input),
+  replaceTrigger: (serverId: number, db: string, schema: string, table: string, trigger: string, input: TriggerInput) =>
+    api.patch(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/triggers/${encodeURIComponent(trigger)}`, input),
+  dropTrigger: (serverId: number, db: string, schema: string, table: string, trigger: string) =>
+    api.delete<void>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/triggers/${encodeURIComponent(trigger)}`),
+  enableTrigger: (serverId: number, db: string, schema: string, table: string, trigger: string) =>
+    api.post<ActionResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/triggers/${encodeURIComponent(trigger)}/enable`),
+  disableTrigger: (serverId: number, db: string, schema: string, table: string, trigger: string) =>
+    api.post<ActionResult>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/triggers/${encodeURIComponent(trigger)}/disable`),
+
+  createPolicy: (serverId: number, db: string, schema: string, table: string, input: PolicyInput) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/policies`, input),
+  replacePolicy: (serverId: number, db: string, schema: string, table: string, policy: string, input: PolicyInput) =>
+    api.patch(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/policies/${encodeURIComponent(policy)}`, input),
+  dropPolicy: (serverId: number, db: string, schema: string, table: string, policy: string) =>
+    api.delete<void>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/policies/${encodeURIComponent(policy)}`),
+
+  createRule: (serverId: number, db: string, schema: string, table: string, input: RuleInput) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/rules`, input),
+  replaceRule: (serverId: number, db: string, schema: string, table: string, rule: string, input: RuleInput) =>
+    api.patch(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/rules/${encodeURIComponent(rule)}`, input),
+  dropRule: (serverId: number, db: string, schema: string, table: string, rule: string) =>
+    api.delete<void>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/rules/${encodeURIComponent(rule)}`),
+
+  policies: (serverId: number, db: string, schema: string, table: string) =>
+    api.get<Policy[]>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/policies`),
+  rules: (serverId: number, db: string, schema: string, table: string) =>
+    api.get<Rule[]>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/rules`),
+
   createExtension: (serverId: number, db: string, name: string, schema: string) =>
     api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/extensions`, { name, schema }),
   dropExtension: (serverId: number, db: string, name: string) =>

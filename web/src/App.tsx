@@ -13,6 +13,7 @@ import QueryToolbar from './components/QueryToolbar';
 import ConnectDialog from './components/Dialogs/ConnectDialog';
 import GroupDialog from './components/Dialogs/GroupDialog';
 import CreateTableDialog from './components/Dialogs/CreateTableDialog';
+import TableEditDialog from './components/Dialogs/TableEditDialog';
 import RoleDialog from './components/Dialogs/RoleDialog';
 import DatabaseDialog from './components/Dialogs/DatabaseDialog';
 import SchemaDialog from './components/Dialogs/SchemaDialog';
@@ -20,6 +21,13 @@ import ViewDialog from './components/Dialogs/ViewDialog';
 import SequenceDialog from './components/Dialogs/SequenceDialog';
 import FunctionDialog from './components/Dialogs/FunctionDialog';
 import IndexDialog from './components/Dialogs/IndexDialog';
+import ColumnDialog from './components/Dialogs/ColumnDialog';
+import ConstraintDialog from './components/Dialogs/ConstraintDialog';
+import TriggerDialog from './components/Dialogs/TriggerDialog';
+import PolicyDialog from './components/Dialogs/PolicyDialog';
+import RuleDialog from './components/Dialogs/RuleDialog';
+import PartitionDialog from './components/Dialogs/PartitionDialog';
+import TruncateDialog from './components/Dialogs/TruncateDialog';
 import ExtensionDialog from './components/Dialogs/ExtensionDialog';
 import GrantDialog from './components/Dialogs/GrantDialog';
 import ConfirmDialog from './components/Dialogs/ConfirmDialog';
@@ -225,7 +233,7 @@ export default function App() {
   };
 
   const handleAction = useCallback((action: ContextAction) => {
-    const { serverId, database, schema, name, nodeType } = action;
+    const { serverId, database, schema, name, nodeType, table } = action;
     const refresh = () => {
       loadData();
       setRefreshKey((k) => k + 1);
@@ -310,6 +318,11 @@ export default function App() {
           setModal({ type: 'table' });
         }
         break;
+      case 'edit-table':
+        if (serverId != null && database && schema && name) {
+          setModal({ type: 'table-edit', serverId, database, schema, table: name });
+        }
+        break;
       case 'drop-table':
         if (serverId != null && database && schema && name) {
           setModal({
@@ -327,18 +340,29 @@ export default function App() {
         break;
       case 'truncate':
         if (serverId != null && database && schema && name) {
-          setModal({
-            type: 'confirm', title: 'Truncate', danger: true,
-            message: `Deseja realmente truncar a tabela "${schema}.${name}"?`,
-            confirmLabel: 'Truncate',
-            onConfirm: async () => { await api.truncateTable(serverId, database, schema, name); refresh(); },
-          });
+          setModal({ type: 'truncate', serverId, database, schema, table: name });
         }
         break;
-      case 'vacuum':
+      case 'reindex-index':
         if (serverId != null && database && schema && name) {
-          setStatus(`VACUUM em ${schema}.${name}...`);
-          api.vacuumTable(serverId, database, schema, name).then(() => setStatus('VACUUM concluído')).catch((e) => setStatus(e.message));
+          setStatus(`REINDEX em ${schema}.${name}...`);
+          api.reindexIndex(serverId, database, schema, name).then(() => setStatus('REINDEX concluído')).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'add-partition':
+        if (serverId != null && database && schema && table) setModal({ type: 'partition-add', serverId, database, schema, table });
+        break;
+      case 'attach-partition':
+        if (serverId != null && database && schema && table) setModal({ type: 'partition-attach', serverId, database, schema, table });
+        break;
+      case 'detach-partition':
+        if (serverId != null && database && schema && name && table) {
+          setModal({
+            type: 'confirm', title: 'Desanexar partição', danger: true,
+            message: `Deseja realmente desanexar a partição "${name}" da tabela "${schema}.${table}"?`,
+            confirmLabel: 'Detach',
+            onConfirm: async () => { await api.detachPartition(serverId, database, schema, table, name); refresh(); },
+          });
         }
         break;
       case 'reindex':
@@ -351,18 +375,6 @@ export default function App() {
         if (serverId != null && database && schema && name) {
           setStatus(`ANALYZE em ${schema}.${name}...`);
           api.analyzeTable(serverId, database, schema, name).then(() => setStatus('ANALYZE concluído')).catch((e) => setStatus(e.message));
-        }
-        break;
-      case 'vacuum-database':
-        if (serverId != null && database) {
-          setStatus(`VACUUM no banco ${database}...`);
-          api.vacuumDatabase(serverId, database, false, false).then(() => setStatus('VACUUM no banco concluído')).catch((e) => setStatus(e.message));
-        }
-        break;
-      case 'vacuum-database-full':
-        if (serverId != null && database) {
-          setStatus(`VACUUM FULL + ANALYZE no banco ${database}...`);
-          api.vacuumDatabase(serverId, database, true, true).then(() => setStatus('VACUUM FULL + ANALYZE concluído')).catch((e) => setStatus(e.message));
         }
         break;
       case 'analyze-database':
@@ -395,6 +407,99 @@ export default function App() {
         break;
       case 'create-index':
         if (serverId != null && database && schema && name) setModal({ type: 'index', serverId, database, schema, table: name });
+        break;
+      case 'edit-index':
+        if (serverId != null && database && schema && name && table) setModal({ type: 'index-edit', serverId, database, schema, table, index: name });
+        break;
+      case 'create-column':
+        if (serverId != null && database && schema && table) setModal({ type: 'column', serverId, database, schema, table });
+        break;
+      case 'edit-column':
+        if (serverId != null && database && schema && name && table) setModal({ type: 'column', serverId, database, schema, table, column: name });
+        break;
+      case 'drop-column':
+        if (serverId != null && database && schema && name && table) {
+          setModal({
+            type: 'confirm', title: 'Deletar coluna', danger: true,
+            message: `Deseja realmente deletar a coluna "${name}" da tabela "${schema}.${table}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.dropColumn(serverId, database, schema, table, name, true); refresh(); },
+          });
+        }
+        break;
+      case 'create-constraint':
+        if (serverId != null && database && schema && table) setModal({ type: 'constraint', serverId, database, schema, table });
+        break;
+      case 'edit-constraint':
+        if (serverId != null && database && schema && name && table) setModal({ type: 'constraint', serverId, database, schema, table, constraint: name });
+        break;
+      case 'drop-constraint':
+        if (serverId != null && database && schema && name && table) {
+          setModal({
+            type: 'confirm', title: 'Deletar constraint', danger: true,
+            message: `Deseja realmente deletar a constraint "${name}" da tabela "${schema}.${table}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.dropConstraint(serverId, database, schema, table, name, true); refresh(); },
+          });
+        }
+        break;
+      case 'create-trigger':
+        if (serverId != null && database && schema && table) setModal({ type: 'trigger', serverId, database, schema, table });
+        break;
+      case 'edit-trigger':
+        if (serverId != null && database && schema && name && table) setModal({ type: 'trigger', serverId, database, schema, table, trigger: name });
+        break;
+      case 'drop-trigger':
+        if (serverId != null && database && schema && name && table) {
+          setModal({
+            type: 'confirm', title: 'Deletar trigger', danger: true,
+            message: `Deseja realmente deletar o trigger "${name}" da tabela "${schema}.${table}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.dropTrigger(serverId, database, schema, table, name); refresh(); },
+          });
+        }
+        break;
+      case 'enable-trigger':
+        if (serverId != null && database && schema && name && table) {
+          api.enableTrigger(serverId, database, schema, table, name).then(() => setStatus(`Trigger ${name} habilitado`)).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'disable-trigger':
+        if (serverId != null && database && schema && name && table) {
+          api.disableTrigger(serverId, database, schema, table, name).then(() => setStatus(`Trigger ${name} desabilitado`)).catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'create-policy':
+        if (serverId != null && database && schema && table) setModal({ type: 'policy', serverId, database, schema, table });
+        break;
+      case 'edit-policy':
+        if (serverId != null && database && schema && name && table) setModal({ type: 'policy', serverId, database, schema, table, policy: name });
+        break;
+      case 'drop-policy':
+        if (serverId != null && database && schema && name && table) {
+          setModal({
+            type: 'confirm', title: 'Deletar policy', danger: true,
+            message: `Deseja realmente deletar a policy "${name}" da tabela "${schema}.${table}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.dropPolicy(serverId, database, schema, table, name); refresh(); },
+          });
+        }
+        break;
+      case 'create-rule':
+        if (serverId != null && database && schema && table) setModal({ type: 'rule', serverId, database, schema, table });
+        break;
+      case 'edit-rule':
+        if (serverId != null && database && schema && name && table) setModal({ type: 'rule', serverId, database, schema, table, rule: name });
+        break;
+      case 'drop-rule':
+        if (serverId != null && database && schema && name && table) {
+          setModal({
+            type: 'confirm', title: 'Deletar rule', danger: true,
+            message: `Deseja realmente deletar a rule "${name}" da tabela "${schema}.${table}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.dropRule(serverId, database, schema, table, name); refresh(); },
+          });
+        }
         break;
       case 'create-extension':
         if (serverId != null && database) setModal({ type: 'extension', serverId, database });
@@ -455,6 +560,9 @@ export default function App() {
       case 'search':
         setSearchInitialQuery(name ?? '');
         setSearchOpen(true);
+        break;
+      case 'refresh':
+        refresh();
         break;
       default:
         break;
@@ -664,6 +772,9 @@ export default function App() {
       {modal?.type === 'table' && (
         <CreateTableDialog serverId={context.serverId} database={context.database} schema={context.schema} onSaved={loadData} onClose={() => setModal(null)} />
       )}
+      {modal?.type === 'table-edit' && (
+        <TableEditDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
       {modal?.type === 'role' && (
         <RoleDialog serverId={context.serverId} role={modal.role} onSaved={loadData} onClose={() => setModal(null)} />
       )}
@@ -687,6 +798,33 @@ export default function App() {
       )}
       {modal?.type === 'index' && (
         <IndexDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'index-edit' && (
+        <IndexDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} index={modal.index} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'column' && (
+        <ColumnDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} column={modal.column} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'constraint' && (
+        <ConstraintDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} constraint={modal.constraint} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'trigger' && (
+        <TriggerDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} trigger={modal.trigger} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'policy' && (
+        <PolicyDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} policy={modal.policy} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'rule' && (
+        <RuleDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} rule={modal.rule} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'partition-add' && (
+        <PartitionDialog mode="add" serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'partition-attach' && (
+        <PartitionDialog mode="attach" serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'truncate' && (
+        <TruncateDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'extension' && (
         <ExtensionDialog serverId={modal.serverId} database={modal.database} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />

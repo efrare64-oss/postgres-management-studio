@@ -95,6 +95,19 @@ func (h *ClusterHandler) tableStatistics(c *gin.Context) {
 	OK(c, out)
 }
 
+func (h *ClusterHandler) columnStats(c *gin.Context) {
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	out, err := h.service.GetColumnStats(c.Request.Context(), id, c.Param("database"), c.Param("schema"), c.Param("table"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	OK(c, out)
+}
+
 func (h *ClusterHandler) serverDashboard(c *gin.Context) {
 	id, ok := parseID(c, "id")
 	if !ok {

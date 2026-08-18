@@ -106,6 +106,16 @@ const LEAF_TYPES: Record<string, string> = {
   types: 'type',
 };
 
+const COMMON_LEAF_KINDS = new Set([
+  'column', 'index', 'constraint', 'trigger', 'rule', 'partition', 'rls_policy',
+  'cast', 'event_trigger', 'extension', 'fdw', 'language', 'publication', 'subscription',
+  'aggregate', 'collation', 'domain', 'foreign_table', 'fts_configuration', 'fts_dictionary',
+  'fts_parser', 'fts_template', 'operator', 'synonym', 'type', 'tablespace',
+  'sequence', 'function', 'view', 'matview',
+]);
+
+const SQL_COPY_KINDS = new Set(['table', 'view', 'matview', 'sequence', 'function']);
+
 const DATABASE_KINDS = new Set(DB_OBJECTS.map((g) => g.kind));
 const SCHEMA_KINDS = new Set(SCHEMA_OBJECTS.map((g) => g.kind));
 
@@ -269,6 +279,32 @@ export default function BrowserPanel({ servers, groups, selectedKey, refreshKey 
 }
 
 function buildContextItems(node: BuiltNode, onAction: (a: ContextAction) => void): ContextItem[] {
+  const items = baseContextItems(node, onAction);
+  if (!COMMON_LEAF_KINDS.has(node.type) || !node.name) return items;
+
+  const common: ContextItem[] = items.length ? [{ sep: true }] : [];
+  common.push({
+    label: 'Copy Name', icon: 'copy',
+    onClick: () => navigator.clipboard?.writeText(node.name as string),
+  });
+  if (SQL_COPY_KINDS.has(node.type)) {
+    common.push({
+      label: 'Copy SQL', icon: 'sql',
+      onClick: async () => {
+        try {
+          const s = await api.objectSql(node.serverId as number, node.database as string, node.schema as string, node.type, node.name as string);
+          await navigator.clipboard?.writeText(s.sql);
+        } catch (err) {
+          console.error(err);
+        }
+      },
+    });
+  }
+  common.push({ label: 'Refresh', icon: 'refresh', onClick: () => onAction({ kind: 'refresh' }) });
+  return [...items, ...common];
+}
+
+function baseContextItems(node: BuiltNode, onAction: (a: ContextAction) => void): ContextItem[] {
   const act = (kind: string) => () => onAction({ kind, serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, nodeType: node.type });
 
   switch (node.type) {
@@ -297,8 +333,6 @@ function buildContextItems(node: BuiltNode, onAction: (a: ContextAction) => void
         { label: 'New Database...', icon: 'database', onClick: () => onAction({ kind: 'create-database', serverId: node.serverId }) },
         { label: 'Grants...', icon: 'role', onClick: () => onAction({ kind: 'grants', serverId: node.serverId, database: node.database ?? undefined, name: node.database ?? undefined, nodeType: 'database' }) },
         { sep: true },
-        { label: 'Vacuum', icon: 'refresh', onClick: () => onAction({ kind: 'vacuum-database', serverId: node.serverId, database: node.database ?? undefined }) },
-        { label: 'Vacuum Full + Analyze', icon: 'refresh', onClick: () => onAction({ kind: 'vacuum-database-full', serverId: node.serverId, database: node.database ?? undefined }) },
         { label: 'Analyze', icon: 'refresh', onClick: () => onAction({ kind: 'analyze-database', serverId: node.serverId, database: node.database ?? undefined }) },
         { sep: true },
         { label: 'Backup...', icon: 'backup', onClick: () => onAction({ kind: 'backup', serverId: node.serverId, database: node.database ?? undefined }) },
@@ -319,9 +353,9 @@ function buildContextItems(node: BuiltNode, onAction: (a: ContextAction) => void
       return [
         { label: 'View/Edit Data', icon: 'table', onClick: () => onAction({ kind: 'view-data', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Count Rows', icon: 'chart', onClick: () => onAction({ kind: 'count-rows', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        { label: 'Edit Properties...', icon: 'edit', onClick: () => onAction({ kind: 'edit-table', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'New Index...', icon: 'index', onClick: () => onAction({ kind: 'create-index', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Backup...', icon: 'backup', onClick: () => onAction({ kind: 'backup', serverId: node.serverId, database: node.database ?? undefined, name: node.name }) },
-        { label: 'Vacuum', icon: 'refresh', onClick: () => onAction({ kind: 'vacuum', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Reindex', icon: 'refresh', onClick: () => onAction({ kind: 'reindex', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Analyze', icon: 'refresh', onClick: () => onAction({ kind: 'analyze-table', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Truncate...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'truncate', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
@@ -354,7 +388,69 @@ function buildContextItems(node: BuiltNode, onAction: (a: ContextAction) => void
       ];
     case 'index':
       return [
+        { label: 'Edit Index...', icon: 'edit', onClick: () => onAction({ kind: 'edit-index', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+        { label: 'Reindex', icon: 'refresh', onClick: () => onAction({ kind: 'reindex-index', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Drop Index...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-index', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+      ];
+    case 'partition':
+      return [
+        { label: 'Detach Partition...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'detach-partition', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'column':
+      return [
+        { label: 'Edit Column...', icon: 'edit', onClick: () => onAction({ kind: 'edit-column', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+        { label: 'Drop Column...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-column', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'constraint':
+      return [
+        { label: 'Edit Constraint...', icon: 'edit', onClick: () => onAction({ kind: 'edit-constraint', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+        { label: 'Drop Constraint...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-constraint', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'trigger':
+      return [
+        { label: 'Edit Trigger...', icon: 'edit', onClick: () => onAction({ kind: 'edit-trigger', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+        { label: 'Enable', icon: 'refresh', onClick: () => onAction({ kind: 'enable-trigger', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+        { label: 'Disable', icon: 'close', onClick: () => onAction({ kind: 'disable-trigger', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+        { label: 'Drop Trigger...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-trigger', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'rls_policy':
+      return [
+        { label: 'Edit Policy...', icon: 'edit', onClick: () => onAction({ kind: 'edit-policy', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+        { label: 'Drop Policy...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-policy', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'rule':
+      return [
+        { label: 'Edit Rule...', icon: 'edit', onClick: () => onAction({ kind: 'edit-rule', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+        { label: 'Drop Rule...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-rule', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'columns':
+      return [
+        { label: 'New Column...', icon: 'plus', onClick: () => onAction({ kind: 'create-column', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'constraints':
+      return [
+        { label: 'New Constraint...', icon: 'plus', onClick: () => onAction({ kind: 'create-constraint', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'indexes':
+      return [
+        { label: 'New Index...', icon: 'plus', onClick: () => onAction({ kind: 'create-index', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'triggers':
+      return [
+        { label: 'New Trigger...', icon: 'plus', onClick: () => onAction({ kind: 'create-trigger', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'row_security_policies':
+      return [
+        { label: 'New Policy...', icon: 'plus', onClick: () => onAction({ kind: 'create-policy', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'rules':
+      return [
+        { label: 'New Rule...', icon: 'plus', onClick: () => onAction({ kind: 'create-rule', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+      ];
+    case 'partitions':
+      return [
+        { label: 'New Partition...', icon: 'plus', onClick: () => onAction({ kind: 'add-partition', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
+        { label: 'Attach Partition...', icon: 'table', onClick: () => onAction({ kind: 'attach-partition', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
       ];
     case 'extensions':
       return [
@@ -460,6 +556,7 @@ function node(partial: Partial<BuiltNode> & { key: string; type: string; label: 
     database: partial.database,
     schema: partial.schema,
     name: partial.name,
+    table: partial.table,
   };
 }
 
@@ -478,6 +575,7 @@ function folder(
     schema: n.schema,
     serverId: n.serverId,
     name: n.name,
+    table: parent === 'table' ? n.name : n.table,
     data: { parent, children: g.children },
   });
 }
@@ -674,13 +772,14 @@ async function loadCatalogObjects(n: BuiltNode): Promise<BuiltNode[]> {
   return items.map((o) => node({
     key: `${n.key}:${o.name}`,
     type: leaf,
-    label: o.name,
+    label: leaf === 'partition' && o.detail ? `${o.name} ${o.detail}` : o.name,
     icon: leaf,
     loadable: leaf === 'foreign_table',
     database: db,
     schema,
     serverId: s,
     name: o.name,
+    table: parent === 'table' || parent === 'constraints' ? name : undefined,
     data: o,
   }));
 }

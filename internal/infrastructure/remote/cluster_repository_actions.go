@@ -202,27 +202,23 @@ func whereClause(values map[string]any, start int) (string, []any) {
 // Maintenance / actions
 // ---------------------------------------------------------------------------
 
-func (r *ClusterRepository) TruncateTable(ctx context.Context, q connection.Querier, schema, table string) error {
-	return r.execSQL(ctx, q, "TRUNCATE TABLE "+qualifiedName(schema, table), "truncate table")
-}
-
-func (r *ClusterRepository) VacuumTable(ctx context.Context, q connection.Querier, schema, table string) error {
-	return r.execSQL(ctx, q, "VACUUM "+qualifiedName(schema, table), "vacuum table")
-}
-
-func (r *ClusterRepository) VacuumDatabase(ctx context.Context, q connection.Querier, full bool, analyze bool) error {
-	sql := "VACUUM"
-	if full {
-		sql += " FULL"
+func (r *ClusterRepository) TruncateTable(ctx context.Context, q connection.Querier, schema, table string, restartIdentity, cascade bool) error {
+	sql := "TRUNCATE TABLE " + qualifiedName(schema, table)
+	if restartIdentity {
+		sql += " RESTART IDENTITY"
 	}
-	if analyze {
-		sql += " ANALYZE"
+	if cascade {
+		sql += " CASCADE"
 	}
-	return r.execSQL(ctx, q, sql, "vacuum database")
+	return r.execSQL(ctx, q, sql, "truncate table")
 }
 
 func (r *ClusterRepository) ReindexTable(ctx context.Context, q connection.Querier, schema, table string) error {
 	return r.execSQL(ctx, q, "REINDEX TABLE "+qualifiedName(schema, table), "reindex table")
+}
+
+func (r *ClusterRepository) ReindexIndex(ctx context.Context, q connection.Querier, schema, name string) error {
+	return r.execSQL(ctx, q, "REINDEX INDEX "+qualifiedName(schema, name), "reindex index")
 }
 
 func (r *ClusterRepository) AnalyzeTable(ctx context.Context, q connection.Querier, schema, table string) error {
@@ -396,6 +392,12 @@ func (r *ClusterRepository) CreateIndex(ctx context.Context, q connection.Querie
 		sql += "UNIQUE "
 	}
 	sql += "INDEX " + quoteIdent(in.Name) + " ON " + qualifiedName(schema, table) + " USING " + method + " (" + in.Columns + ")"
+	if in.Fillfactor > 0 {
+		sql += fmt.Sprintf(" WITH (fillfactor = %d)", in.Fillfactor)
+	}
+	if in.Tablespace != "" {
+		sql += " TABLESPACE " + quoteIdent(in.Tablespace)
+	}
 	if in.Where != "" {
 		sql += " WHERE " + in.Where
 	}

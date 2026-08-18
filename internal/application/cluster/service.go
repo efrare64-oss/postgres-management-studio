@@ -202,6 +202,16 @@ func (s *Service) GetTableStats(ctx context.Context, serverID int64, database, s
 	return out, err
 }
 
+func (s *Service) GetColumnStats(ctx context.Context, serverID int64, database, schema, table string) ([]cluster.ColumnStat, error) {
+	var out []cluster.ColumnStat
+	err := s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		var err error
+		out, err = s.repo.GetColumnStats(ctx, q, schema, table)
+		return err
+	})
+	return out, err
+}
+
 func (s *Service) GetCompletionSchema(ctx context.Context, serverID int64, database string) ([]cluster.CompletionTable, error) {
 	var out []cluster.CompletionTable
 	err := s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
@@ -270,27 +280,39 @@ func (s *Service) SaveTableData(ctx context.Context, serverID int64, database, s
 // Maintenance / actions
 // ---------------------------------------------------------------------------
 
-func (s *Service) TruncateTable(ctx context.Context, serverID int64, database, schema, table string) error {
+func (s *Service) TruncateTable(ctx context.Context, serverID int64, database, schema, table string, restartIdentity, cascade bool) error {
 	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
-		return s.repo.TruncateTable(ctx, q, schema, table)
-	})
-}
-
-func (s *Service) VacuumTable(ctx context.Context, serverID int64, database, schema, table string) error {
-	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
-		return s.repo.VacuumTable(ctx, q, schema, table)
-	})
-}
-
-func (s *Service) VacuumDatabase(ctx context.Context, serverID int64, database string, full bool, analyze bool) error {
-	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
-		return s.repo.VacuumDatabase(ctx, q, full, analyze)
+		return s.repo.TruncateTable(ctx, q, schema, table, restartIdentity, cascade)
 	})
 }
 
 func (s *Service) ReindexTable(ctx context.Context, serverID int64, database, schema, table string) error {
 	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
 		return s.repo.ReindexTable(ctx, q, schema, table)
+	})
+}
+
+func (s *Service) ReindexIndex(ctx context.Context, serverID int64, database, schema, name string) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.ReindexIndex(ctx, q, schema, name)
+	})
+}
+
+func (s *Service) AddPartition(ctx context.Context, serverID int64, database, schema, table string, name, bounds string) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.AddPartition(ctx, q, schema, table, name, bounds)
+	})
+}
+
+func (s *Service) AttachPartition(ctx context.Context, serverID int64, database, schema, table, partition, bounds string) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.AttachPartition(ctx, q, schema, table, partition, bounds)
+	})
+}
+
+func (s *Service) DetachPartition(ctx context.Context, serverID int64, database, schema, table, partition string) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.DetachPartition(ctx, q, schema, table, partition)
 	})
 }
 
@@ -418,6 +440,132 @@ func (s *Service) CreateIndex(ctx context.Context, serverID int64, database, sch
 	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
 		return s.repo.CreateIndex(ctx, q, schema, table, in)
 	})
+}
+
+func (s *Service) ReplaceIndex(ctx context.Context, serverID int64, database, schema, table, index string, in cluster.IndexInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.ReplaceIndex(ctx, q, schema, table, index, in)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Table object CRUD
+// ---------------------------------------------------------------------------
+
+func (s *Service) AddColumn(ctx context.Context, serverID int64, database, schema, table string, in cluster.AddColumnInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.AddColumn(ctx, q, schema, table, in)
+	})
+}
+
+func (s *Service) AlterColumn(ctx context.Context, serverID int64, database, schema, table, column string, in cluster.AlterColumnInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.AlterColumn(ctx, q, schema, table, column, in)
+	})
+}
+
+func (s *Service) DropColumn(ctx context.Context, serverID int64, database, schema, table, column string, cascade bool) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.DropColumn(ctx, q, schema, table, column, cascade)
+	})
+}
+
+func (s *Service) CreateConstraint(ctx context.Context, serverID int64, database, schema, table string, in cluster.ConstraintInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.CreateConstraint(ctx, q, schema, table, in)
+	})
+}
+
+func (s *Service) AlterConstraint(ctx context.Context, serverID int64, database, schema, table, constraint string, in cluster.ConstraintInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.AlterConstraint(ctx, q, schema, table, constraint, in)
+	})
+}
+
+func (s *Service) DropConstraint(ctx context.Context, serverID int64, database, schema, table, constraint string, cascade bool) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.DropConstraint(ctx, q, schema, table, constraint, cascade)
+	})
+}
+
+func (s *Service) CreateTrigger(ctx context.Context, serverID int64, database, schema, table string, in cluster.TriggerInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.CreateTrigger(ctx, q, schema, table, in)
+	})
+}
+
+func (s *Service) ReplaceTrigger(ctx context.Context, serverID int64, database, schema, table, trigger string, in cluster.TriggerInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.ReplaceTrigger(ctx, q, schema, table, trigger, in)
+	})
+}
+
+func (s *Service) DropTrigger(ctx context.Context, serverID int64, database, schema, table, trigger string) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.DropTrigger(ctx, q, schema, table, trigger)
+	})
+}
+
+func (s *Service) SetTriggerEnabled(ctx context.Context, serverID int64, database, schema, table, trigger string, enable bool) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.SetTriggerEnabled(ctx, q, schema, table, trigger, enable)
+	})
+}
+
+func (s *Service) CreatePolicy(ctx context.Context, serverID int64, database, schema, table string, in cluster.PolicyInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.CreatePolicy(ctx, q, schema, table, in)
+	})
+}
+
+func (s *Service) ReplacePolicy(ctx context.Context, serverID int64, database, schema, table, policy string, in cluster.PolicyInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.ReplacePolicy(ctx, q, schema, table, policy, in)
+	})
+}
+
+func (s *Service) DropPolicy(ctx context.Context, serverID int64, database, schema, table, policy string) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.DropPolicy(ctx, q, schema, table, policy)
+	})
+}
+
+func (s *Service) CreateRule(ctx context.Context, serverID int64, database, schema, table string, in cluster.RuleInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.CreateRule(ctx, q, schema, table, in)
+	})
+}
+
+func (s *Service) ReplaceRule(ctx context.Context, serverID int64, database, schema, table, rule string, in cluster.RuleInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.ReplaceRule(ctx, q, schema, table, rule, in)
+	})
+}
+
+func (s *Service) DropRule(ctx context.Context, serverID int64, database, schema, table, rule string) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.DropRule(ctx, q, schema, table, rule)
+	})
+}
+
+func (s *Service) ListPolicies(ctx context.Context, serverID int64, database, schema, table string) ([]cluster.Policy, error) {
+	var out []cluster.Policy
+	err := s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		var err error
+		out, err = s.repo.ListPolicies(ctx, q, schema, table)
+		return err
+	})
+	return out, err
+}
+
+func (s *Service) ListRules(ctx context.Context, serverID int64, database, schema, table string) ([]cluster.Rule, error) {
+	var out []cluster.Rule
+	err := s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		var err error
+		out, err = s.repo.ListRules(ctx, q, schema, table)
+		return err
+	})
+	return out, err
 }
 
 func (s *Service) CreateExtension(ctx context.Context, serverID int64, database, name, schema string) error {

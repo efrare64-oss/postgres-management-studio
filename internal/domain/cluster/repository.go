@@ -28,6 +28,7 @@ type Repository interface {
 	ListCatalogObjects(ctx context.Context, q connection.Querier, scope CatalogScope, kind string) ([]CatalogObject, error)
 	GetObjectSQL(ctx context.Context, q connection.Querier, schema, name, kind string) (string, error)
 	GetTableStats(ctx context.Context, q connection.Querier, schema, table string) (*TableStats, error)
+	GetColumnStats(ctx context.Context, q connection.Querier, schema, table string) ([]ColumnStat, error)
 	GetCompletionSchema(ctx context.Context, q connection.Querier) ([]CompletionTable, error)
 	GetServerDashboard(ctx context.Context, q connection.Querier) (*ServerDashboard, error)
 	GetDatabaseDashboard(ctx context.Context, q connection.Querier) (*DatabaseDashboard, error)
@@ -38,10 +39,12 @@ type Repository interface {
 	SaveTableData(ctx context.Context, q connection.Querier, schema, table string, input TableDataSave) (*DataSaveResult, error)
 
 	// Maintenance / actions
-	TruncateTable(ctx context.Context, q connection.Querier, schema, table string) error
-	VacuumTable(ctx context.Context, q connection.Querier, schema, table string) error
-	VacuumDatabase(ctx context.Context, q connection.Querier, full bool, analyze bool) error
+	TruncateTable(ctx context.Context, q connection.Querier, schema, table string, restartIdentity, cascade bool) error
 	ReindexTable(ctx context.Context, q connection.Querier, schema, table string) error
+	ReindexIndex(ctx context.Context, q connection.Querier, schema, name string) error
+	AddPartition(ctx context.Context, q connection.Querier, schema, table string, name, bounds string) error
+	AttachPartition(ctx context.Context, q connection.Querier, schema, table, partition, bounds string) error
+	DetachPartition(ctx context.Context, q connection.Querier, schema, table, partition string) error
 	AnalyzeTable(ctx context.Context, q connection.Querier, schema, table string) error
 	AnalyzeDatabase(ctx context.Context, q connection.Querier) error
 	RefreshMatView(ctx context.Context, q connection.Querier, schema, name string, withData bool) error
@@ -61,6 +64,27 @@ type Repository interface {
 	CreateFunction(ctx context.Context, q connection.Querier, schema, name string, in FunctionInput) error
 	CreateIndex(ctx context.Context, q connection.Querier, schema, table string, in IndexInput) error
 	CreateExtension(ctx context.Context, q connection.Querier, name, schema string) error
+
+	// Table object CRUD
+	AddColumn(ctx context.Context, q connection.Querier, schema, table string, in AddColumnInput) error
+	AlterColumn(ctx context.Context, q connection.Querier, schema, table, column string, in AlterColumnInput) error
+	DropColumn(ctx context.Context, q connection.Querier, schema, table, column string, cascade bool) error
+	CreateConstraint(ctx context.Context, q connection.Querier, schema, table string, in ConstraintInput) error
+	AlterConstraint(ctx context.Context, q connection.Querier, schema, table, constraint string, in ConstraintInput) error
+	DropConstraint(ctx context.Context, q connection.Querier, schema, table, constraint string, cascade bool) error
+	ReplaceIndex(ctx context.Context, q connection.Querier, schema, table, index string, in IndexInput) error
+	CreateTrigger(ctx context.Context, q connection.Querier, schema, table string, in TriggerInput) error
+	ReplaceTrigger(ctx context.Context, q connection.Querier, schema, table, trigger string, in TriggerInput) error
+	DropTrigger(ctx context.Context, q connection.Querier, schema, table, trigger string) error
+	SetTriggerEnabled(ctx context.Context, q connection.Querier, schema, table, trigger string, enable bool) error
+	CreatePolicy(ctx context.Context, q connection.Querier, schema, table string, in PolicyInput) error
+	ReplacePolicy(ctx context.Context, q connection.Querier, schema, table, policy string, in PolicyInput) error
+	DropPolicy(ctx context.Context, q connection.Querier, schema, table, policy string) error
+	ListPolicies(ctx context.Context, q connection.Querier, schema, table string) ([]Policy, error)
+	CreateRule(ctx context.Context, q connection.Querier, schema, table string, in RuleInput) error
+	ReplaceRule(ctx context.Context, q connection.Querier, schema, table, rule string, in RuleInput) error
+	DropRule(ctx context.Context, q connection.Querier, schema, table, rule string) error
+	ListRules(ctx context.Context, q connection.Querier, schema, table string) ([]Rule, error)
 
 	// Dashboard extras
 	ListLocks(ctx context.Context, q connection.Querier) ([]Lock, error)

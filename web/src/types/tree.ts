@@ -9,4 +9,5 @@ export interface TreeNode {
   database?: string | null;
   schema?: string | null;
   name?: string;
+  table?: string | null;
 }

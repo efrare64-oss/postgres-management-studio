@@ -5,19 +5,35 @@ export interface Column {
   default?: string | null;
   is_primary: boolean;
   position: number;
+  width?: number | null;
+  precision?: number | null;
+  scale?: number | null;
+  storage: string;
+  collation: string;
 }
 
 export interface Index {
   name: string;
-  columns: string;
+  columns: string[];
+  definition: string;
   unique: boolean;
   method: string;
+  predicate?: string | null;
+  tablespace: string;
+  fillfactor: number;
+  storage_params: string[];
+  clustered: boolean;
 }
 
 export interface Constraint {
   name: string;
   type: string;
   definition: string;
+  ref_table?: string;
+  ref_columns?: string[];
+  on_delete?: string;
+  on_update?: string;
+  deferrable?: boolean;
 }
 
 export interface Trigger {
@@ -27,6 +43,7 @@ export interface Trigger {
   events: string;
   function: string;
   enabled: string;
+  definition: string;
 }
 
 export interface Table {
@@ -35,6 +52,16 @@ export interface Table {
   owner: string;
   size: string;
   comment?: string | null;
+  row_estimate?: number;
+  tablespace?: string;
+  fillfactor?: number;
+  storage_params?: string[];
+  access_method?: string;
+  persistence?: string;
+  partition_key?: string | null;
+  has_oids?: boolean;
+  indexes_size?: string;
+  toast_size?: string;
 }
 
 export interface TableDetail {
@@ -64,6 +91,18 @@ export interface TableStats {
   last_auto_analyze?: string | null;
   last_analyze?: string | null;
   last_vacuum?: string | null;
+  last_auto_vacuum?: string | null;
+}
+
+export interface ColumnStat {
+  column: string;
+  null_frac: number;
+  avg_width: number;
+  n_distinct: number;
+  correlation: number;
+  most_common_vals: string[];
+  most_common_freqs: number[];
+  histogram_bounds: string[];
 }
 
 export interface CompletionColumn {
@@ -203,6 +242,79 @@ export interface IndexInput {
   unique: boolean;
   method: string;
   where: string;
+  tablespace: string;
+  fillfactor: number;
+}
+
+export interface AddColumnInput {
+  name: string;
+  data_type: string;
+  nullable: boolean;
+  default: string;
+  collation: string;
+}
+
+export interface AlterColumnInput {
+  new_name?: string | null;
+  data_type?: string | null;
+  not_null?: boolean | null;
+  default?: string | null;
+}
+
+export interface ConstraintInput {
+  name: string;
+  type: string;
+  columns: string[];
+  check: string;
+  ref_table: string;
+  ref_columns: string[];
+  on_delete: string;
+  on_update: string;
+  deferrable: boolean;
+  exclusion: string;
+}
+
+export interface TriggerInput {
+  name: string;
+  timing: string;
+  events: string[];
+  function: string;
+  for_each_row: boolean;
+  when: string;
+}
+
+export interface PolicyInput {
+  name: string;
+  command: string;
+  roles: string[];
+  permissive: boolean;
+  using: string;
+  with_check: string;
+}
+
+export interface RuleInput {
+  name: string;
+  event: string;
+  instead: boolean;
+  where: string;
+  action: string;
+}
+
+export interface Policy {
+  name: string;
+  command: string;
+  roles: string[];
+  permissive: boolean;
+  using: string;
+  with_check: string;
+}
+
+export interface Rule {
+  name: string;
+  event: string;
+  instead: boolean;
+  where: string;
+  action: string;
 }
 
 export interface Dependency {

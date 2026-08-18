@@ -37,6 +37,7 @@ func (h *ClusterHandler) Register(r *gin.RouterGroup) {
 	r.GET("/servers/:id/databases/:database/schemas/:schema/tables/:table", h.tableDetail)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/tables/:table/triggers", h.listTriggers)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/tables/:table/statistics", h.tableStatistics)
+	r.GET("/servers/:id/databases/:database/schemas/:schema/tables/:table/column-stats", h.columnStats)
 	r.GET("/servers/:id/databases/:database/completion-schema", h.completionSchema)
 	r.POST("/servers/:id/databases/:database/schemas/:schema/tables", h.createTable)
 	r.PATCH("/servers/:id/databases/:database/schemas/:schema/tables/:table", h.patchTable)
@@ -47,6 +48,7 @@ func (h *ClusterHandler) Register(r *gin.RouterGroup) {
 	r.DELETE("/servers/:id/roles/:name", h.dropRole)
 
 	h.registerActions(r)
+	h.registerCRUD(r)
 }
 
 func (h *ClusterHandler) listDatabases(c *gin.Context) {

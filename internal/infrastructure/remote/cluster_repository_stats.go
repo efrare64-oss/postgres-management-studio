@@ -27,7 +27,8 @@ func (r *ClusterRepository) GetTableStats(ctx context.Context, q connection.Quer
 		       COALESCE(stat.n_tup_del, 0),
 		       stat.last_autoanalyze::text,
 		       stat.last_analyze::text,
-		       stat.last_vacuum::text
+		       stat.last_vacuum::text,
+		       stat.last_autovacuum::text
 		FROM pg_class c
 		JOIN pg_namespace n ON n.oid = c.relnamespace
 		LEFT JOIN pg_stat_user_tables stat ON stat.relid = c.oid
@@ -37,12 +38,44 @@ func (r *ClusterRepository) GetTableStats(ctx context.Context, q connection.Quer
 		&s.TableName, &s.Size, &s.IndexSize, &s.Rows, &s.DeadRows,
 		&s.SeqScans, &s.SeqTupRead, &s.IdxScans, &s.IdxTupFetch,
 		&s.Inserts, &s.Updates, &s.Deletes,
-		&s.LastAutoAnalyze, &s.LastAnalyze, &s.LastVacuum,
+		&s.LastAutoAnalyze, &s.LastAnalyze, &s.LastVacuum, &s.LastAutoVacuum,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("load table statistics: %w", err)
 	}
 	return &s, nil
+}
+
+func (r *ClusterRepository) GetColumnStats(ctx context.Context, q connection.Querier, schema, table string) ([]cluster.ColumnStat, error) {
+	rows, err := q.Query(ctx, `
+		SELECT attname,
+		       null_frac,
+		       avg_width,
+		       n_distinct,
+		       correlation,
+		       COALESCE(most_common_vals::text[], ARRAY[]::text[]),
+		       COALESCE(most_common_freqs::float8[], ARRAY[]::float8[]),
+		       COALESCE(histogram_bounds::text[], ARRAY[]::text[])
+		FROM pg_stats
+		WHERE schemaname = $1 AND tablename = $2
+		ORDER BY attname`, schema, table)
+	if err != nil {
+		return nil, fmt.Errorf("load column statistics: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]cluster.ColumnStat, 0)
+	for rows.Next() {
+		var s cluster.ColumnStat
+		if err := rows.Scan(
+			&s.Column, &s.NullFraction, &s.AverageWidth, &s.NDistinct, &s.Correlation,
+			&s.MostCommonValues, &s.MostCommonFreqs, &s.HistogramBounds,
+		); err != nil {
+			return nil, fmt.Errorf("scan column statistics: %w", err)
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }
 
 func (r *ClusterRepository) GetServerDashboard(ctx context.Context, q connection.Querier) (*cluster.ServerDashboard, error) {

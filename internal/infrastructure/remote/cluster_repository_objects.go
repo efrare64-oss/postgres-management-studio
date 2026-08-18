@@ -118,7 +118,8 @@ func (r *ClusterRepository) ListTriggers(ctx context.Context, q connection.Queri
 		          CASE WHEN t.tgtype & 32 = 32 THEN 'TRUNCATE' END
 		        ]) e WHERE e IS NOT NULL),
 		       pg_get_function_identity_arguments(t.tgfoid) || ' ON ' || t.tgqual::text,
-		       CASE t.tgenabled WHEN 'O' THEN 'enabled' WHEN 'D' THEN 'disabled' ELSE 'other' END
+		       CASE t.tgenabled WHEN 'O' THEN 'enabled' WHEN 'D' THEN 'disabled' ELSE 'other' END,
+		       pg_get_triggerdef(t.oid)
 		FROM pg_trigger t
 		JOIN pg_class c ON c.oid = t.tgrelid
 		JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -132,7 +133,7 @@ func (r *ClusterRepository) ListTriggers(ctx context.Context, q connection.Queri
 	out := make([]cluster.Trigger, 0)
 	for rows.Next() {
 		var t cluster.Trigger
-		if err := rows.Scan(&t.Name, &t.Table, &t.Timing, &t.Events, &t.Function, &t.Enabled); err != nil {
+		if err := rows.Scan(&t.Name, &t.Table, &t.Timing, &t.Events, &t.Function, &t.Enabled, &t.Definition); err != nil {
 			return nil, fmt.Errorf("scan trigger: %w", err)
 		}
 		out = append(out, t)
