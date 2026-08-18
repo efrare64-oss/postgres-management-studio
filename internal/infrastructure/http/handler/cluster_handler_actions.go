@@ -37,10 +37,15 @@ func (h *ClusterHandler) registerActions(r *gin.RouterGroup) {
 	r.DELETE("/servers/:id/databases/:database/schemas/:schema/sequences/:sequence", h.dropObject)
 	r.POST("/servers/:id/databases/:database/schemas/:schema/functions", h.createFunction)
 	r.DELETE("/servers/:id/databases/:database/schemas/:schema/functions/:function", h.dropFunction)
+	r.POST("/servers/:id/databases/:database/schemas/:schema/procedures", h.createProcedure)
+	r.DELETE("/servers/:id/databases/:database/schemas/:schema/procedures/:procedure", h.dropProcedure)
 	r.POST("/servers/:id/databases/:database/schemas/:schema/tables/:table/indexes", h.createIndex)
 	r.DELETE("/servers/:id/databases/:database/schemas/:schema/indexes/:index", h.dropObject)
 	r.POST("/servers/:id/databases/:database/extensions", h.createExtension)
 	r.DELETE("/servers/:id/databases/:database/extensions/:extension", h.dropObject)
+	r.DELETE("/servers/:id/databases/:database/objects/:kind/:name", h.dropCatalogObject)
+	r.DELETE("/servers/:id/databases/:database/schemas/:schema/objects/:kind/:name", h.dropCatalogObject)
+	r.DELETE("/servers/:id/tablespaces/:name", h.dropTablespace)
 
 	r.GET("/servers/:id/databases/:database/locks", h.listLocks)
 	r.GET("/servers/:id/databases/:database/settings", h.listSettings)
@@ -362,6 +367,18 @@ func (h *ClusterHandler) dropFunction(c *gin.Context) {
 	NoContent(c)
 }
 
+func (h *ClusterHandler) dropProcedure(c *gin.Context) {
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.service.DropObject(c.Request.Context(), id, c.Param("database"), c.Param("schema"), c.Param("procedure"), "procedure", c.DefaultQuery("cascade", "false") == "true"); err != nil {
+		respondError(c, err)
+		return
+	}
+	NoContent(c)
+}
+
 func (h *ClusterHandler) dropObjectKind(c *gin.Context, kind, name string) {
 	id, ok := parseID(c, "id")
 	if !ok {
@@ -369,6 +386,22 @@ func (h *ClusterHandler) dropObjectKind(c *gin.Context, kind, name string) {
 	}
 	cascade := c.DefaultQuery("cascade", "false") == "true"
 	if err := h.service.DropObject(c.Request.Context(), id, c.Param("database"), c.Param("schema"), name, kind, cascade); err != nil {
+		respondError(c, err)
+		return
+	}
+	NoContent(c)
+}
+
+func (h *ClusterHandler) dropCatalogObject(c *gin.Context) {
+	h.dropObjectKind(c, c.Param("kind"), c.Param("name"))
+}
+
+func (h *ClusterHandler) dropTablespace(c *gin.Context) {
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	if err := h.service.DropTablespace(c.Request.Context(), id, c.Param("name")); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -504,6 +537,32 @@ func (h *ClusterHandler) createFunction(c *gin.Context) {
 		return
 	}
 	OK(c, gin.H{"message": "function created"})
+}
+
+func (h *ClusterHandler) createProcedure(c *gin.Context) {
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+
+	var in struct {
+		Name string                 `json:"name"`
+		Proc cluster.ProcedureInput `json:"procedure"`
+	}
+	if err := c.ShouldBindJSON(&in); err != nil {
+		Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if in.Name == "" {
+		Error(c, http.StatusBadRequest, "name is required")
+		return
+	}
+
+	if err := h.service.CreateProcedure(c.Request.Context(), id, c.Param("database"), c.Param("schema"), in.Name, in.Proc); err != nil {
+		respondError(c, err)
+		return
+	}
+	OK(c, gin.H{"message": "procedure created"})
 }
 
 func (h *ClusterHandler) createIndex(c *gin.Context) {

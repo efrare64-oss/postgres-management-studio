@@ -258,6 +258,10 @@ func (r *ClusterRepository) DropFunction(ctx context.Context, q connection.Queri
 	return r.execSQL(ctx, q, "DROP FUNCTION "+qualifiedName(schema, name)+args, "drop function")
 }
 
+func (r *ClusterRepository) DropProcedure(ctx context.Context, q connection.Querier, schema, name string) error {
+	return r.execSQL(ctx, q, "DROP PROCEDURE "+qualifiedName(schema, name), "drop procedure")
+}
+
 func (r *ClusterRepository) DropSchema(ctx context.Context, q connection.Querier, schema string, cascade bool) error {
 	return r.execSQL(ctx, q, "DROP SCHEMA "+quoteIdent(schema)+cascadeSQL(cascade), "drop schema")
 }
@@ -268,6 +272,33 @@ func (r *ClusterRepository) DropExtension(ctx context.Context, q connection.Quer
 
 func (r *ClusterRepository) DropIndex(ctx context.Context, q connection.Querier, schema, name string) error {
 	return r.execSQL(ctx, q, "DROP INDEX "+qualifiedName(schema, name), "drop index")
+}
+
+func (r *ClusterRepository) DropCatalogObject(ctx context.Context, q connection.Querier, schema, name, kind string, cascade bool) error {
+	stmt := map[string]string{
+		"event_trigger":     "DROP EVENT TRIGGER " + quoteIdent(name),
+		"language":          "DROP LANGUAGE " + quoteIdent(name),
+		"publication":       "DROP PUBLICATION " + quoteIdent(name),
+		"subscription":      "DROP SUBSCRIPTION " + quoteIdent(name),
+		"fdw":               "DROP FOREIGN DATA WRAPPER " + quoteIdent(name),
+		"collation":         "DROP COLLATION " + qualifiedName(schema, name),
+		"domain":            "DROP DOMAIN " + qualifiedName(schema, name),
+		"type":              "DROP TYPE " + qualifiedName(schema, name),
+		"fts_configuration": "DROP TEXT SEARCH CONFIGURATION " + qualifiedName(schema, name),
+		"fts_dictionary":    "DROP TEXT SEARCH DICTIONARY " + qualifiedName(schema, name),
+		"fts_parser":        "DROP TEXT SEARCH PARSER " + qualifiedName(schema, name),
+		"fts_template":      "DROP TEXT SEARCH TEMPLATE " + qualifiedName(schema, name),
+		"foreign_table":     "DROP FOREIGN TABLE " + qualifiedName(schema, name),
+		"tablespace":        "DROP TABLESPACE " + quoteIdent(name),
+	}
+	sql, ok := stmt[kind]
+	if !ok {
+		return fmt.Errorf("unsupported drop kind %q", kind)
+	}
+	if cascade {
+		sql += " CASCADE"
+	}
+	return r.execSQL(ctx, q, sql, "drop "+kind)
 }
 
 func cascadeSQL(cascade bool) string {
@@ -377,6 +408,23 @@ func (r *ClusterRepository) CreateFunction(ctx context.Context, q connection.Que
 
 	sql := verb + " FUNCTION " + qualifiedName(schema, name) + "(" + in.Arguments + ") RETURNS " + returnType + " LANGUAGE " + language + " " + volatility + " AS $$" + body + "$$"
 	return r.execSQL(ctx, q, sql, "create function")
+}
+
+func (r *ClusterRepository) CreateProcedure(ctx context.Context, q connection.Querier, schema, name string, in cluster.ProcedureInput) error {
+	language := in.Language
+	if language == "" {
+		language = "plpgsql"
+	}
+	body := strings.TrimSpace(in.Body)
+	if body == "" {
+		return fmt.Errorf("procedure body is required")
+	}
+	verb := "CREATE"
+	if in.Replace {
+		verb = "CREATE OR REPLACE"
+	}
+	sql := verb + " PROCEDURE " + qualifiedName(schema, name) + "(" + in.Arguments + ") LANGUAGE " + language + " AS $$" + body + "$$"
+	return r.execSQL(ctx, q, sql, "create procedure")
 }
 
 func (r *ClusterRepository) CreateIndex(ctx context.Context, q connection.Querier, schema, table string, in cluster.IndexInput) error {

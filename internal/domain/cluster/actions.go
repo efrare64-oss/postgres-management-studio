@@ -84,6 +84,13 @@ type FunctionInput struct {
 	Replace     bool   `json:"replace"`
 }
 
+type ProcedureInput struct {
+	Language  string `json:"language"`
+	Arguments string `json:"arguments"`
+	Body      string `json:"body"`
+	Replace   bool   `json:"replace"`
+}
+
 type IndexInput struct {
 	Name       string `json:"name"`
 	Columns    string `json:"columns"`

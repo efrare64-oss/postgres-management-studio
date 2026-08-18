@@ -20,6 +20,7 @@ import SchemaDialog from './components/Dialogs/SchemaDialog';
 import ViewDialog from './components/Dialogs/ViewDialog';
 import SequenceDialog from './components/Dialogs/SequenceDialog';
 import FunctionDialog from './components/Dialogs/FunctionDialog';
+import ProcedureDialog from './components/Dialogs/ProcedureDialog';
 import IndexDialog from './components/Dialogs/IndexDialog';
 import ColumnDialog from './components/Dialogs/ColumnDialog';
 import ConstraintDialog from './components/Dialogs/ConstraintDialog';
@@ -41,7 +42,7 @@ import { Fa } from './icons';
 let tabSeq = 1;
 
 const OPENABLE = [
-  'table', 'view', 'matview', 'sequence', 'function', 'role', 'column', 'index', 'constraint', 'trigger',
+  'table', 'view', 'matview', 'sequence', 'function', 'procedure', 'role', 'column', 'index', 'constraint', 'trigger',
   'tablespace', 'cast', 'event_trigger', 'extension', 'fdw', 'language', 'publication', 'subscription',
   'aggregate', 'collation', 'domain', 'foreign_table', 'fts_configuration', 'fts_dictionary', 'fts_parser',
   'fts_template', 'operator', 'synonym', 'type', 'rule', 'partition', 'rls_policy',
@@ -196,9 +197,9 @@ export default function App() {
     }
   };
 
-  const openQueryTool = () => {
+  const openQueryTool = (opts?: { initialQuery?: string; title?: string }) => {
     const ctx: QueryContext = { serverId: context.serverId || (servers[0]?.id ?? null), database: context.database || null };
-    openTab({ id: `query:${tabSeq++}`, title: 'Query Tool', kind: 'query', context: ctx });
+    openTab({ id: `query:${tabSeq++}`, title: opts?.title || 'Query Tool', kind: 'query', context: ctx, ...(opts?.initialQuery ? { initialQuery: opts.initialQuery } : {}) });
   };
 
   const setActiveQueryServer = (serverId: string) => {
@@ -405,6 +406,12 @@ export default function App() {
       case 'create-function':
         if (serverId != null && database && schema) setModal({ type: 'function', serverId, database, schema });
         break;
+      case 'create-procedure':
+        if (serverId != null && database && schema) setModal({ type: 'procedure', serverId, database, schema });
+        break;
+      case 'create-trigger-function':
+        if (serverId != null && database && schema) setModal({ type: 'function', serverId, database, schema, initialReturnType: 'trigger', title: 'Nova Trigger Function' });
+        break;
       case 'create-index':
         if (serverId != null && database && schema && name) setModal({ type: 'index', serverId, database, schema, table: name });
         break;
@@ -504,6 +511,16 @@ export default function App() {
       case 'create-extension':
         if (serverId != null && database) setModal({ type: 'extension', serverId, database });
         break;
+      case 'drop-procedure':
+        if (serverId != null && database && name) {
+          setModal({
+            type: 'confirm', title: 'Deletar procedure', danger: true,
+            message: `Deseja realmente deletar a procedure "${schema ? schema + '.' : ''}${name}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => { await api.dropProcedure(serverId, database, schema || 'public', name); refresh(); },
+          });
+        }
+        break;
       case 'drop-view':
       case 'drop-matview':
       case 'drop-sequence':
@@ -560,6 +577,46 @@ export default function App() {
       case 'search':
         setSearchInitialQuery(name ?? '');
         setSearchOpen(true);
+        break;
+      case 'open-object':
+        if (serverId != null && name) {
+          handleSelect({
+            key: `obj:${serverId}:${database}:${schema}:${nodeType}:${name}`,
+            type: nodeType || 'object', label: name, icon: nodeType || 'object', loadable: false,
+            serverId, database: database ?? undefined, schema: schema ?? undefined, name,
+          });
+        }
+        break;
+      case 'drop-catalog-object':
+        if (serverId != null && name) {
+          setModal({
+            type: 'confirm', title: `Deletar ${nodeType || 'objeto'}`, danger: true,
+            message: `Deseja realmente deletar "${name}"?`,
+            confirmLabel: 'Deletar',
+            onConfirm: async () => {
+              if (nodeType === 'tablespace') {
+                await api.delete<void>(`/servers/${serverId}/tablespaces/${encodeURIComponent(name)}`);
+              } else if (database) {
+                const base = `/servers/${serverId}/databases/${encodeURIComponent(database)}`;
+                const url = schema
+                  ? `${base}/schemas/${encodeURIComponent(schema)}/objects/${nodeType}/${encodeURIComponent(name)}`
+                  : `${base}/objects/${nodeType}/${encodeURIComponent(name)}`;
+                await api.delete<void>(url);
+              }
+              refresh();
+            },
+          });
+        }
+        break;
+      case 'create-script':
+        if (serverId != null && database && name) {
+          api.objectSql(serverId, database, schema || 'public', nodeType || 'schema', name)
+            .then((r) => {
+              const ctx: QueryContext = { serverId, database };
+              openTab({ id: `query:${tabSeq++}`, title: `CREATE ${name}`, kind: 'query', context: ctx, initialQuery: r.sql });
+            })
+            .catch((e) => setStatus(e.message));
+        }
         break;
       case 'refresh':
         refresh();
@@ -746,6 +803,7 @@ export default function App() {
                         database={t.context?.database ?? ''}
                         databases={queryDatabases}
                         running={queryRunning}
+                        initialQuery={t.initialQuery}
                         onServerChange={setActiveQueryServer}
                         onDatabaseChange={setActiveQueryDatabase}
                         onRunningChange={setQueryRunning}
@@ -794,7 +852,10 @@ export default function App() {
         <SequenceDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'function' && (
-        <FunctionDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+        <FunctionDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} initialReturnType={modal.initialReturnType} title={modal.title} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'procedure' && (
+        <ProcedureDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'index' && (
         <IndexDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />

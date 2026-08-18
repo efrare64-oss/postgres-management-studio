@@ -30,6 +30,7 @@ interface QueryToolProps {
   database: string;
   databases: { name: string; size: string }[];
   running: boolean;
+  initialQuery?: string;
   onServerChange: (id: string) => void;
   onDatabaseChange: (db: string) => void;
   onRunningChange: (v: boolean) => void;
@@ -77,10 +78,10 @@ function buildSchema(tables: CompletionTable[]): { schema: SQLNamespace; default
 }
 
 const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool(
-  { servers, serverId, database, databases, running, onServerChange, onDatabaseChange, onRunningChange },
+  { servers, serverId, database, databases, running, initialQuery, onServerChange, onDatabaseChange, onRunningChange },
   ref,
 ) {
-  const [sqlText, setSqlText] = useState('');
+  const [sqlText, setSqlText] = useState(initialQuery || '');
   const [completion, setCompletion] = useState<CompletionTable[]>([]);
   const [tab, setTab] = useState('results');
   const [results, setResults] = useState<QueryResult[]>([]);

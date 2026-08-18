@@ -5,7 +5,7 @@ import DataGrid from './DataGrid';
 import type { Dependency, Dependent, TreeNode } from '../types';
 
 const OBJECT_KINDS: Record<string, string> = {
-  table: 'table', view: 'view', matview: 'matview', sequence: 'sequence', function: 'function',
+  table: 'table', view: 'view', matview: 'matview', sequence: 'sequence', function: 'function', procedure: 'procedure',
   index: 'index',
 };
 
@@ -128,6 +128,7 @@ function PropertiesView({ node }: { node: TreeNode }) {
   if (node.type === 'role') return keyValue(roleProps(node.data as Record<string, unknown>));
   if (node.type === 'sequence') return keyValue(seqProps(node.data as Record<string, unknown>));
   if (node.type === 'function') return keyValue(fnProps(node.data as Record<string, unknown>));
+  if (node.type === 'procedure') return keyValue(procProps(node.data as Record<string, unknown>));
   const detail = (node.data as { detail?: string } | undefined)?.detail;
   return keyValue({ name: node.name, type: node.type, ...(detail ? { detail } : {}) });
 }
@@ -554,4 +555,7 @@ function seqProps(s: Record<string, unknown>) {
 }
 function fnProps(f: Record<string, unknown>) {
   return { name: f.name, schema: f.schema, language: f.language, arguments: f.arguments, return_type: f.return_type };
+}
+function procProps(p: Record<string, unknown>) {
+  return { name: p.name, schema: p.schema, language: p.language, arguments: p.arguments };
 }

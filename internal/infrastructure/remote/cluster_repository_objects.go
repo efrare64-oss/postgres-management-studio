@@ -105,6 +105,34 @@ func (r *ClusterRepository) ListFunctions(ctx context.Context, q connection.Quer
 	return out, rows.Err()
 }
 
+func (r *ClusterRepository) ListProcedures(ctx context.Context, q connection.Querier, schema string) ([]cluster.Procedure, error) {
+	rows, err := q.Query(ctx, `
+		SELECT p.proname,
+		       n.nspname,
+		       pg_get_userbyid(p.proowner),
+		       pg_get_function_identity_arguments(p.oid),
+		       l.lanname
+		FROM pg_proc p
+		JOIN pg_namespace n ON n.oid = p.pronamespace
+		JOIN pg_language l ON l.oid = p.prolang
+		WHERE n.nspname = $1 AND p.prokind = 'p'
+		ORDER BY p.proname`, schema)
+	if err != nil {
+		return nil, fmt.Errorf("list procedures: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]cluster.Procedure, 0)
+	for rows.Next() {
+		var p cluster.Procedure
+		if err := rows.Scan(&p.Name, &p.Schema, &p.Owner, &p.Arguments, &p.Language); err != nil {
+			return nil, fmt.Errorf("scan procedure: %w", err)
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 func (r *ClusterRepository) ListTriggers(ctx context.Context, q connection.Querier, schema, table string) ([]cluster.Trigger, error) {
 	rows, err := q.Query(ctx, `
 		SELECT t.tgname,

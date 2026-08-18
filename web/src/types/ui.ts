@@ -14,6 +14,7 @@ export interface AppTab {
   kind: TabKind;
   node?: TreeNode;
   context?: QueryContext;
+  initialQuery?: string;
 }
 
 export type ModalState =
@@ -26,7 +27,8 @@ export type ModalState =
   | { type: 'schema'; serverId: number; database: string }
   | { type: 'view'; serverId: number; database: string; schema: string; kind: 'view' | 'matview' }
   | { type: 'sequence'; serverId: number; database: string; schema: string }
-  | { type: 'function'; serverId: number; database: string; schema: string }
+  | { type: 'function'; serverId: number; database: string; schema: string; initialReturnType?: string; title?: string }
+  | { type: 'procedure'; serverId: number; database: string; schema: string }
   | { type: 'index'; serverId: number; database: string; schema: string; table: string }
   | { type: 'index-edit'; serverId: number; database: string; schema: string; table: string; index: string }
   | { type: 'column'; serverId: number; database: string; schema: string; table: string; column?: string | null }

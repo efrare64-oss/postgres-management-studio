@@ -111,10 +111,32 @@ const COMMON_LEAF_KINDS = new Set([
   'cast', 'event_trigger', 'extension', 'fdw', 'language', 'publication', 'subscription',
   'aggregate', 'collation', 'domain', 'foreign_table', 'fts_configuration', 'fts_dictionary',
   'fts_parser', 'fts_template', 'operator', 'synonym', 'type', 'tablespace',
-  'sequence', 'function', 'view', 'matview',
+  'sequence', 'function', 'procedure', 'view', 'matview',
 ]);
 
-const SQL_COPY_KINDS = new Set(['table', 'view', 'matview', 'sequence', 'function']);
+const SQL_COPY_KINDS = new Set(['table', 'view', 'matview', 'sequence', 'function', 'procedure', 'type', 'domain', 'collation', 'foreign_table', 'fts_configuration', 'fts_dictionary', 'fts_parser', 'fts_template', 'language', 'publication', 'fdw', 'event_trigger']);
+
+const SCHEMA_CATALOG_KINDS = new Set([
+  'aggregate', 'collation', 'domain', 'foreign_table', 'fts_configuration', 'fts_dictionary',
+  'fts_parser', 'fts_template', 'operator', 'synonym', 'type',
+]);
+const DATABASE_CATALOG_KINDS = new Set(['cast', 'event_trigger', 'fdw', 'language', 'publication', 'subscription']);
+const DROPPABLE_CATALOG_KINDS = new Set([
+  'event_trigger', 'language', 'publication', 'subscription', 'fdw',
+  'collation', 'domain', 'type', 'fts_configuration', 'fts_dictionary', 'fts_parser', 'fts_template',
+  'foreign_table', 'tablespace',
+]);
+const CATALOG_LEAF_KINDS = new Set([...SCHEMA_CATALOG_KINDS, ...DATABASE_CATALOG_KINDS, 'extension', 'tablespace']);
+
+const FOLDER_TYPES = new Set([
+  'group', 'server', 'database', 'schema',
+  'databases', 'roles', 'tablespaces', 'schemas',
+  'tables', 'views', 'matviews', 'sequences', 'functions', 'procedures',
+  'columns', 'indexes', 'triggers', 'rules', 'row_security_policies', 'partitions',
+  'constraints', 'constraints:check', 'constraints:fk', 'constraints:exclusion', 'constraints:index',
+  ...DB_OBJECTS.map((g) => g.type),
+  ...SCHEMA_OBJECTS.map((g) => g.type),
+]);
 
 const DATABASE_KINDS = new Set(DB_OBJECTS.map((g) => g.kind));
 const SCHEMA_KINDS = new Set(SCHEMA_OBJECTS.map((g) => g.kind));
@@ -130,6 +152,7 @@ const TYPE_COLORS: Record<string, string> = {
   matview: 'text-[#3a6ea5]',
   sequence: 'text-[#8a5a00]',
   function: 'text-[#a03a3a]',
+  procedure: 'text-[#a03a3a]',
   tablespace: 'text-[#8a5a00]',
   cast: 'text-[#5a7a2a]',
   event_trigger: 'text-[#a03a3a]',
@@ -280,6 +303,13 @@ export default function BrowserPanel({ servers, groups, selectedKey, refreshKey 
 
 function buildContextItems(node: BuiltNode, onAction: (a: ContextAction) => void): ContextItem[] {
   const items = baseContextItems(node, onAction);
+  if (FOLDER_TYPES.has(node.type)) {
+    const hasRefresh = items.some((i) => !i.sep && i.label === 'Refresh');
+    if (!hasRefresh) {
+      return [...items, ...(items.length ? [{ sep: true }] : []), { label: 'Refresh', icon: 'refresh', onClick: () => onAction({ kind: 'refresh' }) }];
+    }
+    return items;
+  }
   if (!COMMON_LEAF_KINDS.has(node.type) || !node.name) return items;
 
   const common: ContextItem[] = items.length ? [{ sep: true }] : [];
@@ -289,15 +319,24 @@ function buildContextItems(node: BuiltNode, onAction: (a: ContextAction) => void
   });
   if (SQL_COPY_KINDS.has(node.type)) {
     common.push({
-      label: 'Copy SQL', icon: 'sql',
-      onClick: async () => {
-        try {
-          const s = await api.objectSql(node.serverId as number, node.database as string, node.schema as string, node.type, node.name as string);
-          await navigator.clipboard?.writeText(s.sql);
-        } catch (err) {
-          console.error(err);
-        }
-      },
+      label: 'Scripts', icon: 'sql',
+      children: [
+        {
+          label: 'Create Script...', icon: 'sql',
+          onClick: () => onAction({ kind: 'create-script', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, nodeType: node.type }),
+        },
+        {
+          label: 'Copy SQL', icon: 'sql',
+          onClick: async () => {
+            try {
+              const s = await api.objectSql(node.serverId as number, node.database as string, (node.schema ?? 'public') as string, node.type, node.name as string);
+              await navigator.clipboard?.writeText(s.sql);
+            } catch (err) {
+              console.error(err);
+            }
+          },
+        },
+      ],
     });
   }
   common.push({ label: 'Refresh', icon: 'refresh', onClick: () => onAction({ kind: 'refresh' }) });
@@ -329,8 +368,13 @@ function baseContextItems(node: BuiltNode, onAction: (a: ContextAction) => void)
     case 'database':
       return [
         { label: 'Dashboard', icon: 'chart', onClick: () => onAction({ kind: 'dashboard-database', serverId: node.serverId, database: node.database ?? undefined }) },
-        { label: 'New Schema...', icon: 'plus', onClick: () => onAction({ kind: 'create-schema', serverId: node.serverId, database: node.database ?? undefined }) },
-        { label: 'New Database...', icon: 'database', onClick: () => onAction({ kind: 'create-database', serverId: node.serverId }) },
+        {
+          label: 'Create', icon: 'plus',
+          children: [
+            { label: 'New Schema...', icon: 'plus', onClick: () => onAction({ kind: 'create-schema', serverId: node.serverId, database: node.database ?? undefined }) },
+            { label: 'New Database...', icon: 'database', onClick: () => onAction({ kind: 'create-database', serverId: node.serverId }) },
+          ],
+        },
         { label: 'Grants...', icon: 'role', onClick: () => onAction({ kind: 'grants', serverId: node.serverId, database: node.database ?? undefined, name: node.database ?? undefined, nodeType: 'database' }) },
         { sep: true },
         { label: 'Analyze', icon: 'refresh', onClick: () => onAction({ kind: 'analyze-database', serverId: node.serverId, database: node.database ?? undefined }) },
@@ -341,12 +385,20 @@ function baseContextItems(node: BuiltNode, onAction: (a: ContextAction) => void)
       ];
     case 'schema':
       return [
-        { label: 'New Table...', icon: 'table', onClick: () => onAction({ kind: 'create-table', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
-        { label: 'New View...', icon: 'view', onClick: () => onAction({ kind: 'create-view', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
-        { label: 'New Materialized View...', icon: 'matview', onClick: () => onAction({ kind: 'create-matview', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
-        { label: 'New Sequence...', icon: 'sequence', onClick: () => onAction({ kind: 'create-sequence', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
-        { label: 'New Function...', icon: 'function', onClick: () => onAction({ kind: 'create-function', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+        {
+          label: 'Create', icon: 'plus',
+          children: [
+            { label: 'New Table...', icon: 'table', onClick: () => onAction({ kind: 'create-table', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+            { label: 'New View...', icon: 'view', onClick: () => onAction({ kind: 'create-view', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+            { label: 'New Materialized View...', icon: 'matview', onClick: () => onAction({ kind: 'create-matview', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+            { label: 'New Sequence...', icon: 'sequence', onClick: () => onAction({ kind: 'create-sequence', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+            { label: 'New Function...', icon: 'function', onClick: () => onAction({ kind: 'create-function', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+            { label: 'New Procedure...', icon: 'procedure', onClick: () => onAction({ kind: 'create-procedure', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+            { label: 'New Trigger Function...', icon: 'function', onClick: () => onAction({ kind: 'create-trigger-function', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+          ],
+        },
         { label: 'Grants...', icon: 'role', onClick: () => onAction({ kind: 'grants', serverId: node.serverId, database: node.database ?? undefined, name: node.schema ?? undefined, nodeType: 'schema' }) },
+        { label: 'Create Script...', icon: 'sql', onClick: () => onAction({ kind: 'create-script', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.schema ?? undefined, nodeType: 'schema' }) },
         { label: 'Drop Schema...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-schema', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
       ];
     case 'table':
@@ -354,7 +406,20 @@ function baseContextItems(node: BuiltNode, onAction: (a: ContextAction) => void)
         { label: 'View/Edit Data', icon: 'table', onClick: () => onAction({ kind: 'view-data', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Count Rows', icon: 'chart', onClick: () => onAction({ kind: 'count-rows', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Edit Properties...', icon: 'edit', onClick: () => onAction({ kind: 'edit-table', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
-        { label: 'New Index...', icon: 'index', onClick: () => onAction({ kind: 'create-index', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        {
+          label: 'Create', icon: 'plus',
+          children: [
+            { label: 'New Index...', icon: 'index', onClick: () => onAction({ kind: 'create-index', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+            { label: 'New Column...', icon: 'plus', onClick: () => onAction({ kind: 'create-column', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.name }) },
+            { label: 'New Constraint...', icon: 'plus', onClick: () => onAction({ kind: 'create-constraint', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.name }) },
+            { label: 'New Trigger...', icon: 'plus', onClick: () => onAction({ kind: 'create-trigger', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.name }) },
+            { label: 'New Rule...', icon: 'plus', onClick: () => onAction({ kind: 'create-rule', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.name }) },
+            { label: 'New Policy...', icon: 'plus', onClick: () => onAction({ kind: 'create-policy', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.name }) },
+            { label: 'New Partition...', icon: 'plus', onClick: () => onAction({ kind: 'add-partition', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.name }) },
+            { label: 'Attach Partition...', icon: 'table', onClick: () => onAction({ kind: 'attach-partition', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.name }) },
+          ],
+        },
+        { sep: true },
         { label: 'Backup...', icon: 'backup', onClick: () => onAction({ kind: 'backup', serverId: node.serverId, database: node.database ?? undefined, name: node.name }) },
         { label: 'Reindex', icon: 'refresh', onClick: () => onAction({ kind: 'reindex', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Analyze', icon: 'refresh', onClick: () => onAction({ kind: 'analyze-table', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
@@ -368,6 +433,7 @@ function baseContextItems(node: BuiltNode, onAction: (a: ContextAction) => void)
       ];
     case 'view':
       return [
+        { label: 'View/Edit Data', icon: 'table', onClick: () => onAction({ kind: 'view-data', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Drop View...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-view', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
       ];
     case 'sequence':
@@ -377,6 +443,10 @@ function baseContextItems(node: BuiltNode, onAction: (a: ContextAction) => void)
     case 'function':
       return [
         { label: 'Drop Function...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-function', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+      ];
+    case 'procedure':
+      return [
+        { label: 'Drop Procedure...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-procedure', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
       ];
     case 'role':
       return [
@@ -461,6 +531,23 @@ function baseContextItems(node: BuiltNode, onAction: (a: ContextAction) => void)
         { label: 'New Schema...', icon: 'plus', onClick: () => onAction({ kind: 'create-schema', serverId: node.serverId, database: node.database ?? undefined }) },
       ];
     default:
+      if (FOLDER_TYPES.has(node.type)) return [];
+      if (CATALOG_LEAF_KINDS.has(node.type)) {
+        const items: ContextItem[] = [];
+        if (node.name) {
+          items.push({
+            label: 'Properties', icon: 'properties',
+            onClick: () => onAction({ kind: 'open-object', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, nodeType: node.type }),
+          });
+        }
+        if (node.name && DROPPABLE_CATALOG_KINDS.has(node.type)) {
+          items.push({
+            label: 'Drop...', icon: 'close', danger: true,
+            onClick: () => onAction({ kind: 'drop-catalog-object', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, nodeType: node.type }),
+          });
+        }
+        return items;
+      }
       return [{ label: 'Dashboard', icon: 'chart', onClick: act('dashboard') }];
   }
 }
@@ -641,6 +728,7 @@ async function fetchChildren(
         label: o.name,
         icon: 'tablespace',
         serverId: s,
+        name: o.name,
         data: o,
       }));
     }
@@ -692,6 +780,7 @@ async function fetchChildren(
         node({ key: `${n.key}:matviews`, type: 'matviews', label: 'Materialized Views', icon: 'matviews', loadable: true, database: db, schema, serverId: s }),
         node({ key: `${n.key}:sequences`, type: 'sequences', label: 'Sequences', icon: 'sequences', loadable: true, database: db, schema, serverId: s }),
         node({ key: `${n.key}:functions`, type: 'functions', label: 'Functions', icon: 'functions', loadable: true, database: db, schema, serverId: s }),
+        node({ key: `${n.key}:procedures`, type: 'procedures', label: 'Procedures', icon: 'procedures', loadable: true, database: db, schema, serverId: s }),
       ];
       out.push(...SCHEMA_OBJECTS.map((g) => folder(n, g, 'schema')));
       return out;
@@ -702,6 +791,7 @@ async function fetchChildren(
     case 'matviews': return listObjects(n, '/matviews', 'matview');
     case 'sequences': return listObjects(n, '/sequences', 'sequence');
     case 'functions': return listObjects(n, '/functions', 'function');
+    case 'procedures': return listObjects(n, '/procedures', 'procedure');
 
     case 'table': return buildRelationChildren(n, TABLE_CHILDREN);
     case 'view': return buildRelationChildren(n, VIEW_CHILDREN);
@@ -732,7 +822,7 @@ async function listObjects(n: BuiltNode, path: string, type: string): Promise<Bu
   const items = await api.get<{ name: string }[]>(
     `/servers/${s}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}${path}`,
   );
-  const iconMap: Record<string, string> = { table: 'table', view: 'view', matview: 'matview', sequence: 'sequence', function: 'function' };
+  const iconMap: Record<string, string> = { table: 'table', view: 'view', matview: 'matview', sequence: 'sequence', function: 'function', procedure: 'procedure' };
   return items.map((item) => node({
     key: `${n.key}:${item.name}`,
     type,

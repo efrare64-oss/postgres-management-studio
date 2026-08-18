@@ -23,6 +23,36 @@ func (r *ClusterRepository) GetObjectSQL(ctx context.Context, q connection.Queri
 		return r.sequenceDef(ctx, q, schema, name)
 	case "function":
 		return r.functionDef(ctx, q, schema, name)
+	case "procedure":
+		return r.functionDef(ctx, q, schema, name)
+	case "schema":
+		return r.schemaDef(ctx, q, name)
+	case "type":
+		return r.typeDef(ctx, q, schema, name)
+	case "domain":
+		return r.domainDef(ctx, q, schema, name)
+	case "collation":
+		return r.collationDef(ctx, q, schema, name)
+	case "foreign_table":
+		return r.foreignTableDef(ctx, q, schema, name)
+	case "fts_configuration":
+		return r.ftsConfigurationDef(ctx, q, schema, name)
+	case "fts_dictionary":
+		return r.ftsDictionaryDef(ctx, q, schema, name)
+	case "fts_parser":
+		return r.ftsParserDef(ctx, q, schema, name)
+	case "fts_template":
+		return r.ftsTemplateDef(ctx, q, schema, name)
+	case "language":
+		return r.languageDef(ctx, q, name)
+	case "publication":
+		return r.publicationDef(ctx, q, name)
+	case "fdw":
+		return r.fdwDef(ctx, q, name)
+	case "event_trigger":
+		return r.eventTriggerDef(ctx, q, name)
+	case "tablespace":
+		return r.tablespaceDef(ctx, q, name)
 	default:
 		return "", fmt.Errorf("unsupported object kind %q", kind)
 	}
@@ -264,18 +294,30 @@ func (r *ClusterRepository) sequenceDef(ctx context.Context, q connection.Querie
 	return b.String(), nil
 }
 
+func (r *ClusterRepository) schemaDef(ctx context.Context, q connection.Querier, schema string) (string, error) {
+	var owner string
+	err := q.QueryRow(ctx, `
+		SELECT pg_get_userbyid(nspowner)
+		FROM pg_namespace
+		WHERE nspname = $1`, schema).Scan(&owner)
+	if err != nil {
+		return "", fmt.Errorf("load schema definition: %w", err)
+	}
+	return "CREATE SCHEMA " + quoteIdent(schema) + "\n    AUTHORIZATION " + quoteIdent(owner) + ";", nil
+}
+
 func (r *ClusterRepository) functionDef(ctx context.Context, q connection.Querier, schema, name string) (string, error) {
 	var def string
 	err := q.QueryRow(ctx, `
 		SELECT pg_get_functiondef(p.oid)
 		FROM pg_proc p
 		JOIN pg_namespace n ON n.oid = p.pronamespace
-		WHERE n.nspname = $1 AND p.proname = $2 AND p.prokind = 'f'
+		WHERE n.nspname = $1 AND p.proname = $2 AND p.prokind IN ('f', 'p')
 		ORDER BY p.oid DESC
 		LIMIT 1`, schema, name,
 	).Scan(&def)
 	if err != nil {
-		return "", fmt.Errorf("load function definition: %w", err)
+		return "", fmt.Errorf("load routine definition: %w", err)
 	}
 	return def, nil
 }

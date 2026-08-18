@@ -152,6 +152,16 @@ func (s *Service) ListFunctions(ctx context.Context, serverID int64, database, s
 	return out, err
 }
 
+func (s *Service) ListProcedures(ctx context.Context, serverID int64, database, schema string) ([]cluster.Procedure, error) {
+	var out []cluster.Procedure
+	err := s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		var err error
+		out, err = s.repo.ListProcedures(ctx, q, schema)
+		return err
+	})
+	return out, err
+}
+
 func (s *Service) ListTriggers(ctx context.Context, serverID int64, database, schema, table string) ([]cluster.Trigger, error) {
 	var out []cluster.Trigger
 	err := s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
@@ -345,12 +355,17 @@ func (s *Service) DropObject(ctx context.Context, serverID int64, database, sche
 			return s.repo.DropSequence(ctx, q, schema, name)
 		case "function":
 			return s.repo.DropFunction(ctx, q, schema, name, "")
+		case "procedure":
+			return s.repo.DropProcedure(ctx, q, schema, name)
 		case "schema":
 			return s.repo.DropSchema(ctx, q, schema, cascade)
 		case "extension":
 			return s.repo.DropExtension(ctx, q, name)
 		case "index":
 			return s.repo.DropIndex(ctx, q, schema, name)
+		case "event_trigger", "language", "publication", "subscription", "fdw", "collation", "domain", "type",
+			"fts_configuration", "fts_dictionary", "fts_parser", "fts_template", "foreign_table":
+			return s.repo.DropCatalogObject(ctx, q, schema, name, kind, cascade)
 		default:
 			return fmt.Errorf("unsupported object kind %q", kind)
 		}
@@ -360,6 +375,12 @@ func (s *Service) DropObject(ctx context.Context, serverID int64, database, sche
 func (s *Service) CreateSchema(ctx context.Context, serverID int64, database, name, owner string) error {
 	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
 		return s.repo.CreateSchema(ctx, q, name, owner)
+	})
+}
+
+func (s *Service) DropTablespace(ctx context.Context, serverID int64, name string) error {
+	return s.withServer(ctx, serverID, func(q connection.Querier) error {
+		return s.repo.DropCatalogObject(ctx, q, "", name, "tablespace", true)
 	})
 }
 
@@ -433,6 +454,12 @@ func (s *Service) CreateSequence(ctx context.Context, serverID int64, database, 
 func (s *Service) CreateFunction(ctx context.Context, serverID int64, database, schema, name string, in cluster.FunctionInput) error {
 	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
 		return s.repo.CreateFunction(ctx, q, schema, name, in)
+	})
+}
+
+func (s *Service) CreateProcedure(ctx context.Context, serverID int64, database, schema, name string, in cluster.ProcedureInput) error {
+	return s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
+		return s.repo.CreateProcedure(ctx, q, schema, name, in)
 	})
 }
 

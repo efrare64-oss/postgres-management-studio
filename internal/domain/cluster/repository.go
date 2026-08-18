@@ -23,6 +23,7 @@ type Repository interface {
 	ListMatViews(ctx context.Context, q connection.Querier, schema string) ([]MatView, error)
 	ListSequences(ctx context.Context, q connection.Querier, schema string) ([]Sequence, error)
 	ListFunctions(ctx context.Context, q connection.Querier, schema string) ([]Function, error)
+	ListProcedures(ctx context.Context, q connection.Querier, schema string) ([]Procedure, error)
 	ListTriggers(ctx context.Context, q connection.Querier, schema, table string) ([]Trigger, error)
 	ListTablespaces(ctx context.Context, q connection.Querier) ([]CatalogObject, error)
 	ListCatalogObjects(ctx context.Context, q connection.Querier, scope CatalogScope, kind string) ([]CatalogObject, error)
@@ -52,9 +53,11 @@ type Repository interface {
 	DropMatView(ctx context.Context, q connection.Querier, schema, name string, cascade bool) error
 	DropSequence(ctx context.Context, q connection.Querier, schema, name string) error
 	DropFunction(ctx context.Context, q connection.Querier, schema, name, arguments string) error
+	DropProcedure(ctx context.Context, q connection.Querier, schema, name string) error
 	DropSchema(ctx context.Context, q connection.Querier, schema string, cascade bool) error
 	DropExtension(ctx context.Context, q connection.Querier, name string) error
 	DropIndex(ctx context.Context, q connection.Querier, schema, name string) error
+	DropCatalogObject(ctx context.Context, q connection.Querier, schema, name, kind string, cascade bool) error
 
 	// Create objects
 	CreateSchema(ctx context.Context, q connection.Querier, name, owner string) error
@@ -62,6 +65,7 @@ type Repository interface {
 	CreateMatView(ctx context.Context, q connection.Querier, schema, name, definition string, withData bool) error
 	CreateSequence(ctx context.Context, q connection.Querier, schema, name string, in SequenceInput) error
 	CreateFunction(ctx context.Context, q connection.Querier, schema, name string, in FunctionInput) error
+	CreateProcedure(ctx context.Context, q connection.Querier, schema, name string, in ProcedureInput) error
 	CreateIndex(ctx context.Context, q connection.Querier, schema, table string, in IndexInput) error
 	CreateExtension(ctx context.Context, q connection.Querier, name, schema string) error
 

@@ -236,6 +236,13 @@ export interface FunctionInput {
   replace: boolean;
 }
 
+export interface ProcedureInput {
+  language: string;
+  arguments: string;
+  body: string;
+  replace: boolean;
+}
+
 export interface IndexInput {
   name: string;
   columns: string;

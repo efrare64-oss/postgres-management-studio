@@ -30,6 +30,7 @@ func (h *ClusterHandler) Register(r *gin.RouterGroup) {
 	r.GET("/servers/:id/databases/:database/schemas/:schema/matviews", h.listMatViews)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/sequences", h.listSequences)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/functions", h.listFunctions)
+	r.GET("/servers/:id/databases/:database/schemas/:schema/procedures", h.listProcedures)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/tables/:table/objects/:kind", h.listTableObjects)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/views/:view/objects/:kind", h.listViewObjects)
 	r.GET("/servers/:id/databases/:database/schemas/:schema/foreign-tables/:ftable/objects/:kind", h.listForeignTableObjects)

@@ -12,6 +12,7 @@ const ICONS: Record<string, string> = {
   matview: 'fa fa-clone',
   sequence: 'fa fa-sort-numeric-asc',
   function: 'fa fa-cogs',
+  procedure: 'fa fa-cogs',
   role: 'fa fa-user',
   roles: 'fa fa-users',
   column: 'fa fa-columns',
@@ -72,6 +73,7 @@ const ICONS: Record<string, string> = {
   matviews: 'fa fa-clone',
   sequences: 'fa fa-sort-numeric-asc',
   functions: 'fa fa-cogs',
+  procedures: 'fa fa-cogs',
   columns: 'fa fa-columns',
   indexes: 'fa fa-sort-amount-asc',
   constraints: 'fa fa-link',
@@ -107,6 +109,7 @@ const ICONS: Record<string, string> = {
   lowercase: 'fa fa-sort-alpha-desc',
   'replace-next': 'fa fa-arrow-down',
   'replace-all': 'fa fa-fast-forward',
+  submenu: 'fa fa-caret-right',
 };
 
 function iconClass(name: string): string {

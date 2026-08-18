@@ -56,6 +56,19 @@ func (h *ClusterHandler) listFunctions(c *gin.Context) {
 	OK(c, out)
 }
 
+func (h *ClusterHandler) listProcedures(c *gin.Context) {
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	out, err := h.service.ListProcedures(c.Request.Context(), id, c.Param("database"), c.Param("schema"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	OK(c, out)
+}
+
 func (h *ClusterHandler) listTriggers(c *gin.Context) {
 	id, ok := parseID(c, "id")
 	if !ok {

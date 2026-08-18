@@ -1,6 +1,6 @@
 import type {
   ActionResult, AddColumnInput, AlterColumnInput, BackupOptions, CatalogObject, ColumnStat, CompletionTable, ConstraintInput, CountResult, CSVImportResult, DataSaveResult, DatabaseDashboard,
-  DatabaseInfo, Dependency, Dependent, FunctionInput, GrantInput, HistoryItem, IndexInput, Lock, Policy, PolicyInput, QueryBatch,
+  DatabaseInfo, Dependency, Dependent, FunctionInput, GrantInput, HistoryItem, IndexInput, Lock, Policy, PolicyInput, ProcedureInput, QueryBatch,
   RestoreOptions, Role, Rule, RuleInput, SchemaInfo, SearchObject, SequenceInput, ServerDashboard, Setting, SqlText, StudioServer,
   ServerGroup, ServerExport, TableData, TableDataSave, TableDetail, TableStats, ToolBinary, Trigger, TriggerInput,
 } from './types';
@@ -136,6 +136,10 @@ export const api = {
     api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/functions`, { name, function: fn }),
   dropFunction: (serverId: number, db: string, schema: string, name: string) =>
     api.delete<void>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/functions/${encodeURIComponent(name)}`),
+  createProcedure: (serverId: number, db: string, schema: string, name: string, proc: ProcedureInput) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/procedures`, { name, procedure: proc }),
+  dropProcedure: (serverId: number, db: string, schema: string, name: string) =>
+    api.delete<void>(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/procedures/${encodeURIComponent(name)}`),
   createIndex: (serverId: number, db: string, schema: string, table: string, index: IndexInput) =>
     api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}/indexes`, index),
   replaceIndex: (serverId: number, db: string, schema: string, table: string, index: string, input: IndexInput) =>
