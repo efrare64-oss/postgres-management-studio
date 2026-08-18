@@ -290,6 +290,12 @@ export default function App() {
       case 'create-database':
         if (serverId != null) setModal({ type: 'database', serverId });
         break;
+      case 'create-role':
+        if (serverId != null) {
+          setContext({ serverId, database: database ?? null, schema: schema ?? null });
+          setModal({ type: 'role' });
+        }
+        break;
       case 'drop-database':
         if (serverId != null && database) {
           setModal({

@@ -522,6 +522,38 @@ function baseContextItems(node: BuiltNode, onAction: (a: ContextAction) => void)
         { label: 'New Partition...', icon: 'plus', onClick: () => onAction({ kind: 'add-partition', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
         { label: 'Attach Partition...', icon: 'table', onClick: () => onAction({ kind: 'attach-partition', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name, table: node.table ?? undefined }) },
       ];
+    case 'databases':
+      return [
+        { label: 'New Database...', icon: 'database', onClick: () => onAction({ kind: 'create-database', serverId: node.serverId }) },
+      ];
+    case 'roles':
+      return [
+        { label: 'New Role...', icon: 'role', onClick: () => onAction({ kind: 'create-role', serverId: node.serverId }) },
+      ];
+    case 'tables':
+      return [
+        { label: 'New Table...', icon: 'table', onClick: () => onAction({ kind: 'create-table', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+      ];
+    case 'views':
+      return [
+        { label: 'New View...', icon: 'view', onClick: () => onAction({ kind: 'create-view', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+      ];
+    case 'matviews':
+      return [
+        { label: 'New Materialized View...', icon: 'matview', onClick: () => onAction({ kind: 'create-matview', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+      ];
+    case 'sequences':
+      return [
+        { label: 'New Sequence...', icon: 'sequence', onClick: () => onAction({ kind: 'create-sequence', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+      ];
+    case 'functions':
+      return [
+        { label: 'New Function...', icon: 'function', onClick: () => onAction({ kind: 'create-function', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+      ];
+    case 'procedures':
+      return [
+        { label: 'New Procedure...', icon: 'procedure', onClick: () => onAction({ kind: 'create-procedure', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined }) },
+      ];
     case 'extensions':
       return [
         { label: 'New Extension...', icon: 'plus', onClick: () => onAction({ kind: 'create-extension', serverId: node.serverId, database: node.database ?? undefined }) },
