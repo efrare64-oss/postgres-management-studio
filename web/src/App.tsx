@@ -63,12 +63,13 @@ export default function App() {
   const [resizing, setResizing] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [queryServerId, setQueryServerId] = useState('');
-  const [queryDatabase, setQueryDatabase] = useState('');
   const [queryDatabases, setQueryDatabases] = useState<{ name: string; size: string }[]>([]);
+  const [dbLoading, setDbLoading] = useState(false);
   const [queryRunning, setQueryRunning] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const queryRefs = useRef<Record<string, QueryToolHandle>>({});
+  const dbCacheRef = useRef<Record<string, { name: string; size: string }[]>>({});
+  const dbInflightRef = useRef<Record<string, Promise<{ name: string; size: string }[]>>>({});
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchInitialQuery, setSearchInitialQuery] = useState('');
 
@@ -92,43 +93,59 @@ export default function App() {
     setTabs((ts) => ts.map((t) => (t.id === tabId && t.kind === 'query' ? { ...t, context } : t)));
   };
 
-  useEffect(() => {
-    if (!activeQueryTab) return;
-    const serverId = activeQueryTab.context?.serverId;
-    setQueryServerId(serverId != null ? String(serverId) : '');
-    setQueryDatabase(activeQueryTab.context?.database ?? '');
-  }, [activeQueryTab?.id, activeQueryTab?.context?.serverId, activeQueryTab?.context?.database]);
+  const qServerId = activeQueryTab?.context?.serverId != null ? String(activeQueryTab.context.serverId) : '';
+  const qDatabase = activeQueryTab?.context?.database ?? '';
+  const activeQueryTabId = activeQueryTab?.id ?? '';
+
+  const loadDatabases = useCallback((sid: string) => {
+    const cached = dbCacheRef.current[sid];
+    if (cached) return Promise.resolve(cached);
+    if (!dbInflightRef.current[sid]) {
+      dbInflightRef.current[sid] = api.databases(Number(sid))
+        .then((dbs) => {
+          dbCacheRef.current[sid] = dbs;
+          return dbs;
+        })
+        .finally(() => { delete dbInflightRef.current[sid]; });
+    }
+    return dbInflightRef.current[sid];
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    if (!queryServerId) {
+    if (!qServerId) {
       setQueryDatabases([]);
-      setQueryDatabase('');
-      return () => { cancelled = true; };
+      setDbLoading(false);
+      return;
     }
 
-    api.databases(Number(queryServerId))
-      .then((dbs) => {
-        if (cancelled) return;
-        setQueryDatabases(dbs);
-        setQueryDatabase((prev) => {
-          if (prev && dbs.some((d) => d.name === prev)) return prev;
-          return dbs[0]?.name || '';
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setQueryDatabases([]);
-      });
+    let cancelled = false;
+    const adopt = (dbs: { name: string; size: string }[]) => {
+      setQueryDatabases(dbs);
+      setTabs((ts) => ts.map((t) => {
+        if (t.id !== activeQueryTabId || t.kind !== 'query') return t;
+        const cur = t.context?.database ?? '';
+        if (cur && dbs.some((d) => d.name === cur)) return t;
+        const nextDb = dbs.some((d) => d.name === qDatabase) ? qDatabase : dbs[0]?.name || null;
+        if ((t.context?.database ?? null) === nextDb) return t;
+        return { ...t, context: { ...(t.context ?? { serverId: null }), database: nextDb } };
+      }));
+    };
+
+    const cached = dbCacheRef.current[qServerId];
+    if (cached) {
+      adopt(cached);
+      setDbLoading(false);
+      return;
+    }
+
+    setDbLoading(true);
+    loadDatabases(qServerId)
+      .then((dbs) => { if (!cancelled) adopt(dbs); })
+      .catch(() => { if (!cancelled) setQueryDatabases([]); })
+      .finally(() => { if (!cancelled) setDbLoading(false); });
 
     return () => { cancelled = true; };
-  }, [queryServerId]);
-
-  useEffect(() => {
-    if (!activeQueryTab || !queryDatabase) return;
-    if (activeQueryTab.context?.database !== queryDatabase) {
-      updateQueryTabContext(activeQueryTab.id, { serverId: activeQueryTab.context?.serverId ?? null, database: queryDatabase });
-    }
-  }, [activeQueryTab?.id, queryDatabase]);
+  }, [qServerId, activeQueryTabId, qDatabase, loadDatabases]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -201,26 +218,32 @@ export default function App() {
   };
 
   const openQueryTool = (opts?: { initialQuery?: string; title?: string }) => {
-    const ctx: QueryContext = { serverId: context.serverId || (servers[0]?.id ?? null), database: context.database || null };
+    const base = activeQueryTab?.context ?? context;
+    const ctx: QueryContext = { serverId: base?.serverId ?? servers[0]?.id ?? null, database: base?.database ?? null };
     openTab({ id: `query:${tabSeq++}`, title: opts?.title || 'Query Tool', kind: 'query', context: ctx, ...(opts?.initialQuery ? { initialQuery: opts.initialQuery } : {}) });
+  };
+
+  const handleTabClose = (id: string) => {
+    const t = tabs.find((x) => x.id === id);
+    if (t?.kind === 'query') {
+      window.dispatchEvent(new CustomEvent('pgms:close-tab', { detail: { tabId: id } }));
+      return;
+    }
+    closeTab(id);
   };
 
   const setActiveQueryServer = (serverId: string) => {
     if (!activeQueryTab) return;
     const nextServerId = serverId ? Number(serverId) : null;
-    const nextContext: QueryContext = {
+    updateQueryTabContext(activeQueryTab.id, {
       serverId: nextServerId,
-      database: nextServerId === activeQueryTab.context?.serverId ? activeQueryTab.context?.database : null,
-    };
-    updateQueryTabContext(activeQueryTab.id, nextContext);
-    setQueryServerId(serverId);
-    setQueryDatabase(nextContext.database ?? '');
+      database: nextServerId === activeQueryTab.context?.serverId ? activeQueryTab.context?.database ?? null : null,
+    });
   };
 
   const setActiveQueryDatabase = (database: string) => {
     if (!activeQueryTab) return;
     updateQueryTabContext(activeQueryTab.id, { serverId: activeQueryTab.context?.serverId ?? null, database });
-    setQueryDatabase(database);
   };
 
   const openDashboard = (which: 'server' | 'database') => {
@@ -714,7 +737,7 @@ export default function App() {
         { label: 'About', icon: 'info', onClick: () => setModal({ type: 'about' }) },
       ],
     },
-  ], [context, servers, loadData]);
+  ], [context, servers, loadData, activeQueryTab]);
 
   const toolbar: ToolbarItem[] = useMemo(() => [
     { key: 'new-server', icon: 'server', label: 'New Server', onClick: () => setModal({ type: 'connect' }) },
@@ -724,7 +747,7 @@ export default function App() {
     { key: 'sep1', sep: true },
     { key: 'query', icon: 'sql', label: 'Query Tool', onClick: openQueryTool },
     { key: 'refresh', icon: 'refresh', label: 'Refresh', onClick: loadData },
-  ], [context, loadData]);
+  ], [context, loadData, activeQueryTab]);
 
   const statusText = status || (
     context.serverId
@@ -776,10 +799,11 @@ export default function App() {
           {activeQueryTab && (
             <QueryToolbar
               servers={servers}
-              serverId={queryServerId}
+              serverId={qServerId}
               onServerChange={setActiveQueryServer}
               databases={queryDatabases}
-              database={queryDatabase}
+              database={qDatabase}
+              loading={dbLoading}
               onDatabaseChange={setActiveQueryDatabase}
               running={queryRunning}
               onExecute={() => activeTab && queryRefs.current[activeTab]?.run('execute')}
@@ -802,7 +826,7 @@ export default function App() {
             <Welcome />
           ) : (
             <>
-              <TabBar tabs={tabs} activeTab={activeTab} onSelect={setActiveTab} onClose={closeTab} />
+              <TabBar tabs={tabs} activeTab={activeTab} onSelect={setActiveTab} onClose={handleTabClose} />
               <div className="relative min-h-0 flex-1">
                 {tabs.map((t) => (
                   <div key={t.id} className={`absolute inset-0 h-full w-full ${activeTab === t.id ? 'flex' : 'hidden'}`}>
@@ -818,6 +842,7 @@ export default function App() {
                         databases={queryDatabases}
                         running={queryRunning}
                         initialQuery={t.initialQuery}
+                        isActive={activeTab === t.id}
                         onServerChange={setActiveQueryServer}
                         onDatabaseChange={setActiveQueryDatabase}
                         onRunningChange={setQueryRunning}

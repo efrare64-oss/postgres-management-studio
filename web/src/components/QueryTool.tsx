@@ -11,6 +11,7 @@ import type { SQLNamespace } from '@codemirror/lang-sql';
 import { format as formatSqlText } from 'sql-formatter';
 import { api } from '../api';
 import { DataTable } from './ObjectPanel';
+import Modal from './Dialogs/Modal';
 import type { CompletionTable, HistoryItem, QueryBatch, QueryResult, StudioServer } from '../types';
 
 export interface QueryToolHandle {
@@ -40,6 +41,7 @@ interface QueryToolProps {
   initialQuery?: string;
   initialFilename?: string;
   initialSavedSql?: string;
+  isActive?: boolean;
   onServerChange: (id: string) => void;
   onDatabaseChange: (db: string) => void;
   onRunningChange: (v: boolean) => void;
@@ -119,6 +121,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     initialQuery,
     initialFilename,
     initialSavedSql,
+    isActive = false,
     onServerChange,
     onDatabaseChange,
     onRunningChange,
@@ -143,6 +146,9 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
   const lastSavedSqlRef = useRef<string>(initialSavedSql ?? initialQuery ?? '');
   const dirtyRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const lastRunRef = useRef(0);
+  const pendingAfterUnsavedRef = useRef<(() => void) | null>(null);
+  const [unsavedOpen, setUnsavedOpen] = useState(false);
 
   useEffect(() => {
     api.queryHistory()
@@ -272,6 +278,10 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     if (!database) { setError('Selecione um banco'); setTab('messages'); return; }
     const text = getActiveSql();
     if (!text.trim()) { setError('Digite uma query'); setTab('messages'); return; }
+
+    const now = Date.now();
+    if (now - lastRunRef.current < 250) return;
+    lastRunRef.current = now;
 
     onRunningChange(true);
     setError(null);
@@ -414,8 +424,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     loadFromFile(file.name, content, null);
   };
 
-  const newFile = () => {
-    if (dirtyRef.current && !window.confirm('Descartar alterações não salvas?')) return;
+  const newFile = () => guardUnsaved(() => {
     setSqlText('');
     lastSavedSqlRef.current = '';
     dirtyRef.current = false;
@@ -425,12 +434,40 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     setMessages([]);
     setError(null);
     if (onTitleChange) onTitleChange('Query Tool');
-  };
+  });
 
   const clear = () => { setSqlText(''); setResults([]); setError(null); setMessages([]); };
   const toggleHistory = () => setHistoryOpen((v) => !v);
 
+  const guardUnsaved = useCallback((action: () => void) => {
+    if (!dirtyRef.current) { action(); return; }
+    pendingAfterUnsavedRef.current = action;
+    setUnsavedOpen(true);
+  }, []);
+
+  const handleUnsavedCancel = () => {
+    setUnsavedOpen(false);
+    pendingAfterUnsavedRef.current = null;
+  };
+
+  const handleUnsavedDiscard = () => {
+    setUnsavedOpen(false);
+    const act = pendingAfterUnsavedRef.current;
+    pendingAfterUnsavedRef.current = null;
+    act?.();
+  };
+
+  const handleUnsavedSave = async () => {
+    await saveFile();
+    if (dirtyRef.current) return;
+    setUnsavedOpen(false);
+    const act = pendingAfterUnsavedRef.current;
+    pendingAfterUnsavedRef.current = null;
+    act?.();
+  };
+
   useEffect(() => {
+    if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'F5') {
         e.preventDefault();
@@ -465,7 +502,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [run, saveFile, saveFileAs, openFile, newFile]);
+  }, [isActive, run, saveFile, saveFileAs, openFile, newFile]);
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -541,23 +578,25 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     getTitle: () => filename || 'Query Tool',
     isDirty: () => dirtyRef.current,
     requestClose: () => {
-      if (!dirtyRef.current) return true;
-      return window.confirm('Existem alterações não salvas. Fechar mesmo assim?');
+      if (dirtyRef.current && tabId && onCloseRequest) {
+        guardUnsaved(() => onCloseRequest(tabId));
+        return false;
+      }
+      return !dirtyRef.current;
     },
-  }), [run, formatSql, clear, toggleHistory, openGotoLine, toggleCommentSelection, uppercaseSelection, lowercaseSelection, openFile, saveFile, saveFileAs, newFile, filename]);
+  }), [run, formatSql, clear, toggleHistory, openGotoLine, toggleCommentSelection, uppercaseSelection, lowercaseSelection, openFile, saveFile, saveFileAs, newFile, filename, guardUnsaved, tabId, onCloseRequest]);
 
   useEffect(() => {
     if (!tabId || !onCloseRequest) return;
     const handler = (e: Event) => {
       const ce = e as CustomEvent<{ tabId: string }>;
       if (ce.detail?.tabId === tabId) {
-        if (dirtyRef.current && !window.confirm('Existem alterações não salvas. Fechar mesmo assim?')) return;
-        onCloseRequest(tabId);
+        guardUnsaved(() => onCloseRequest(tabId));
       }
     };
     window.addEventListener('pgms:close-tab', handler);
     return () => window.removeEventListener('pgms:close-tab', handler);
-  }, [tabId, onCloseRequest]);
+  }, [tabId, onCloseRequest, guardUnsaved]);
 
   const totalRows = results.reduce((n, r) => n + r.rows.length, 0);
 
@@ -658,6 +697,19 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
         {results.length > 0 && ` • ${results.reduce((t, r) => t + r.duration_ms, 0)} ms`}
         {running && ' • executando...'}
       </div>
+
+      {unsavedOpen && (
+        <Modal title="Alterações não salvas" onClose={handleUnsavedCancel} width={440}>
+          <div className="form">
+            <p className="text-[13px] text-[#374151]">O editor contém alterações não salvas. Deseja salvá-las antes de fechar?</p>
+            <div className="form-actions">
+              <button className="btn" onClick={handleUnsavedCancel}>Cancelar</button>
+              <button className="btn" onClick={handleUnsavedDiscard}>Não salvar</button>
+              <button className="btn primary" onClick={handleUnsavedSave}>Salvar</button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 });

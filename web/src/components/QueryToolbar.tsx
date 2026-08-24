@@ -7,6 +7,7 @@ interface QueryToolbarProps {
   onServerChange: (id: string) => void;
   databases: { name: string; size: string }[];
   database: string;
+  loading?: boolean;
   onDatabaseChange: (db: string) => void;
   running: boolean;
   onExecute: () => void;
@@ -31,6 +32,7 @@ export default function QueryToolbar({
   onServerChange,
   databases,
   database,
+  loading = false,
   onDatabaseChange,
   running,
   onExecute,
@@ -57,7 +59,14 @@ export default function QueryToolbar({
           {servers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <label className="text-xs text-muted">Banco</label>
-        <select value={database} onChange={(e) => onDatabaseChange(e.target.value)} className="max-w-[180px] rounded border border-border px-1.5 py-1 font-sans text-[13px]">
+        <select
+          value={database}
+          onChange={(e) => onDatabaseChange(e.target.value)}
+          className={`max-w-[180px] rounded border border-border px-1.5 py-1 font-sans text-[13px] ${loading ? 'opacity-60' : ''}`}
+        >
+          {!databases.some((d) => d.name === database) && (
+            <option value={database}>{loading ? 'Carregando...' : database || 'Selecione...'}</option>
+          )}
           {databases.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
         </select>
       </div>
