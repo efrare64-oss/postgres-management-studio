@@ -7,7 +7,7 @@
 
 Versão 0.2.0 • Stack: Go, React + TypeScript + Vite
 
-![Go 1.26+](https://img.shields.io/badge/Go-1.26+-00ADD8)
+![Go 1.27+](https://img.shields.io/badge/Go-1.27+-00ADD8)
 ![React 19+](https://img.shields.io/badge/React-19+-61DAFB)
 ![TypeScript 5+](https://img.shields.io/badge/TypeScript-5+-3178C6)
 ![Vite 8+](https://img.shields.io/badge/Vite-8+-646CFF)
@@ -23,9 +23,12 @@ Versão 0.2.0 • Stack: Go, React + TypeScript + Vite
 
 - 🚀 **Interface intuitiva similar ao pgAdmin 4** / Intuitive interface similar to pgAdmin 4
 - 🔍 **Gerenciamento completo de múltiplos servidores** / Full management of multiple servers
-- 📊 **Visualização de tabelas, views e funções** / Browse tables, views and functions
-- ⚡ **Query Tool com autocomplete, EXPLAIN e múltiplos resultados** / Query Tool with autocomplete, EXPLAIN and multiple result grids
+- 📊 **Visualização de tabelas, views e funções com seleção e cópia** / Browse tables, views and functions with row selection and copy
+- ⚡ **Query Tool com autocomplete, EXPLAIN, múltiplos resultados, exportação CSV e gerenciamento de arquivos** / Query Tool with autocomplete, EXPLAIN, multiple result grids, CSV export and file management
+  - Atalhos / Shortcuts: F5 (executar), Ctrl+S (salvar), Ctrl+Shift+S (salvar como), Ctrl+N (novo), Ctrl+O (abrir)
 - 🛡️ **Conexões seguras com gerenciamento de credenciais** / Secure connections with credential management
+- 📁 **Gerenciamento de arquivos SQL** / SQL file management (New/Open/Save/Save As)
+- 🖱️ **Menus de contexto completos com submenus** / Full context menus with submenus
 - 🌐 **Aplicação desktop nativa (WebView2) + servidor REST** / Native desktop app (WebView2) + REST server
 
 ## 🛠️ Stack Tecnológica / Tech Stack
@@ -36,7 +39,7 @@ Versão 0.2.0 • Stack: Go, React + TypeScript + Vite
 
 ## 📋 Pré-requisitos / Prerequisites
 
-- Go 1.26 ou superior / Go 1.26 or later
+- Go 1.27 ou superior / Go 1.27 or later
 - Node.js 18+ e npm/pnpm / Node.js 18+ and npm/pnpm
 - PostgreSQL 14+ (para testes / for testing)
 - Windows 10/11 com WebView2 Runtime (para o app desktop / for the desktop app)
@@ -114,7 +117,15 @@ postgres-management-studio/
 │   └── assets/            # Assets embutidos / embedded assets
 ├── web/
 │   ├── src/
-│   │   ├── components/    # Componentes React (Query Tool, painéis, dialogs)
+│   │   ├── components/    # Componentes React
+│   │   │   ├── BrowserPanel.tsx   # Explorador de bancos com menus de contexto
+│   │   │   ├── QueryTool.tsx      # Editor SQL com autocomplete e resultados
+│   │   │   ├── QueryToolbar.tsx   # Barra de ferramentas do Query Tool
+│   │   │   ├── ObjectPanel.tsx    # Painéis de detalhes de objetos
+│   │   │   ├── DataGrid.tsx       # Grid de dados editável
+│   │   │   ├── ContextMenu.tsx    # Menus de contexto
+│   │   │   ├── Dialogs/          # Diálogos de criação/edição
+│   │   │   └── ...               # Outros componentes
 │   │   ├── types/         # Types TypeScript
 │   │   ├── api.ts         # Cliente REST / REST client
 │   │   └── App.tsx        # Componente raiz / root component
@@ -140,9 +151,10 @@ postgres-management-studio/
 
 ### Funcionalidades Principais / Main Features
 
-- **Explorador de Banco / Database Explorer** — Navegue por bancos, schemas e tabelas / browse databases, schemas and tables
-- **Query Tool** — Execute SQL com autocomplete, EXPLAIN/EXPLAIN ANALYZE e múltiplos resultados (F5 para executar) / run SQL with autocomplete, EXPLAIN/EXPLAIN ANALYZE and multiple result grids (F5 to run)
-- **Visualização de Tabelas / Table View** — Veja propriedades, colunas, índices e estatísticas / view properties, columns, indexes and statistics
+- **Explorador de Banco / Database Explorer** — Navegue por bancos, schemas e tabelas com menus de contexto / browse databases, schemas and tables with context menus
+- **Query Tool** — Execute SQL com autocomplete, EXPLAIN/EXPLAIN ANALYZE, múltiplos resultados, exportação CSV e gerenciamento de arquivos (Novo/Abrir/Salvar) / run SQL with autocomplete, EXPLAIN/EXPLAIN ANALYZE, multiple result grids, CSV export and file management (New/Open/Save)
+  - Atalhos / Shortcuts: F5 (executar), Ctrl+S (salvar), Ctrl+Shift+S (salvar como), Ctrl+N (novo), Ctrl+O (abrir)
+- **Visualização de Tabelas / Table View** — Veja propriedades, colunas, índices e estatísticas com seleção de linhas e cópia / view properties, columns, indexes and statistics with row selection and copy
 - **Dashboards** — Servidor e banco com sessões ativas e tamanhos / server and database dashboards with active sessions and sizes
 
 ## 🤝 Contribuição / Contributing
@@ -167,9 +179,9 @@ Contributions are very welcome! Please follow these steps:
 - ✅ Conexão básica com PostgreSQL / Basic PostgreSQL connection
 - ✅ Navegação por schemas e tabelas / Schema and table navigation
 - ✅ Query tool com múltiplos resultados / Query tool with multiple result grids
+- ✅ Exportação de dados (CSV) / Data export (CSV)
 - ⬜ Backup automático / Automatic backup
 - ⬜ Monitoramento de performance / Performance monitoring
-- ⬜ Exportação de dados (CSV, JSON) / Data export (CSV, JSON)
 - ⬜ Temas dark/light / Dark/light themes
 - ⬜ Suporte a múltiplas conexões simultâneas / Support for multiple simultaneous connections
 

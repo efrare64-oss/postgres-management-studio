@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql, PostgreSQL } from '@codemirror/lang-sql';
 import { autocompletion, closeBrackets, acceptCompletion, completionStatus } from '@codemirror/autocomplete';
@@ -22,6 +22,13 @@ export interface QueryToolHandle {
   toggleComment: () => void;
   uppercase: () => void;
   lowercase: () => void;
+  openFile: () => void;
+  saveFile: () => void;
+  saveFileAs: () => void;
+  newFile: () => void;
+  getTitle: () => string;
+  isDirty: () => boolean;
+  requestClose: () => boolean;
 }
 
 interface QueryToolProps {
@@ -31,9 +38,14 @@ interface QueryToolProps {
   databases: { name: string; size: string }[];
   running: boolean;
   initialQuery?: string;
+  initialFilename?: string;
+  initialSavedSql?: string;
   onServerChange: (id: string) => void;
   onDatabaseChange: (db: string) => void;
   onRunningChange: (v: boolean) => void;
+  onTitleChange?: (title: string) => void;
+  onCloseRequest?: (tabId: string) => void;
+  tabId?: string;
 }
 
 const ssmsTheme = EditorView.theme({
@@ -77,8 +89,43 @@ function buildSchema(tables: CompletionTable[]): { schema: SQLNamespace; default
   return { schema: root as SQLNamespace, defaultSchema };
 }
 
+type FileHandleLike = {
+  name: string;
+  getFile: () => Promise<File>;
+  createWritable: () => Promise<{
+    write: (data: string | Blob) => Promise<void>;
+    close: () => Promise<void>;
+  }>;
+};
+
+type WindowWithFS = Window & {
+  showOpenFilePicker?: (opts?: {
+    multiple?: boolean;
+    types?: { description: string; accept: Record<string, string[]> }[];
+  }) => Promise<FileHandleLike[]>;
+  showSaveFilePicker?: (opts?: {
+    suggestedName?: string;
+    types?: { description: string; accept: Record<string, string[]> }[];
+  }) => Promise<FileHandleLike>;
+};
+
 const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool(
-  { servers, serverId, database, databases, running, initialQuery, onServerChange, onDatabaseChange, onRunningChange },
+  {
+    servers,
+    serverId,
+    database,
+    databases,
+    running,
+    initialQuery,
+    initialFilename,
+    initialSavedSql,
+    onServerChange,
+    onDatabaseChange,
+    onRunningChange,
+    onTitleChange,
+    onCloseRequest,
+    tabId,
+  },
   ref,
 ) {
   const [sqlText, setSqlText] = useState(initialQuery || '');
@@ -91,6 +138,11 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
   const [historyOpen, setHistoryOpen] = useState(false);
   const [showResults, setShowResults] = useState(true);
   const [editorView, setEditorView] = useState<EditorView | null>(null);
+  const [filename, setFilename] = useState<string | null>(initialFilename || null);
+  const fileHandleRef = useRef<FileHandleLike | null>(null);
+  const lastSavedSqlRef = useRef<string>(initialSavedSql ?? initialQuery ?? '');
+  const dirtyRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     api.queryHistory()
@@ -127,6 +179,19 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
       .then((items) => setHistory(items))
       .catch(() => { /* ignore */ });
   };
+
+  const updateDirty = useCallback((text: string) => {
+    const dirty = text !== lastSavedSqlRef.current;
+    dirtyRef.current = dirty;
+    if (onTitleChange) {
+      const base = filename || 'Query Tool';
+      onTitleChange(dirty ? `${base} *` : base);
+    }
+  }, [filename, onTitleChange]);
+
+  useEffect(() => {
+    updateDirty(sqlText);
+  }, [sqlText, updateDirty]);
 
   const formatSql = () => {
     const sql = sqlText.trim();
@@ -191,10 +256,22 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     URL.revokeObjectURL(url);
   };
 
+  const getActiveSql = useCallback((): string => {
+    if (editorView) {
+      const sel = editorView.state.selection.main;
+      if (!sel.empty) {
+        const slice = editorView.state.doc.sliceString(sel.from, sel.to);
+        if (slice.trim()) return slice;
+      }
+    }
+    return sqlText;
+  }, [editorView, sqlText]);
+
   const run = async (mode: 'execute' | 'explain' | 'explain-analyze') => {
     if (!serverId) { setError('Selecione um servidor'); setTab('messages'); return; }
     if (!database) { setError('Selecione um banco'); setTab('messages'); return; }
-    if (!sqlText.trim()) { setError('Digite uma query'); setTab('messages'); return; }
+    const text = getActiveSql();
+    if (!text.trim()) { setError('Digite uma query'); setTab('messages'); return; }
 
     onRunningChange(true);
     setError(null);
@@ -204,22 +281,25 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
       const data = await api.runQuery(
         Number(serverId),
         database,
-        sqlText,
+        text,
         mode === 'explain' || mode === 'explain-analyze',
         mode === 'explain-analyze',
       );
-      setResults(data.results);
+      setResults(data.results ?? []);
       setShowResults(true);
       setTab(data.error ? 'messages' : 'results');
-      if (data.results.length === 0 && !data.error) {
+      const results = data.results ?? [];
+      if (results.length === 0 && !data.error) {
         pushMessage('Nenhum comando foi executado.');
       }
-      data.results.forEach((r, idx) => {
-        const label = data.results.length > 1 ? `[${idx + 1}] ` : '';
+      results.forEach((r, idx) => {
+        const label = results.length > 1 ? `[${idx + 1}] ` : '';
+        const rows = r.rows ?? [];
+        const columns = r.columns ?? [];
         if (mode !== 'execute') {
           pushMessage(`${label}EXPLAIN ${mode === 'explain-analyze' ? 'ANALYZE ' : ''}em ${r.duration_ms} ms`);
-        } else if (r.columns.length > 0) {
-          pushMessage(`${label}SELECT ${r.rows.length} linha(s) em ${r.duration_ms} ms`);
+        } else if (columns.length > 0) {
+          pushMessage(`${label}SELECT ${rows.length} linha(s) em ${r.duration_ms} ms`);
         } else {
           pushMessage(`${label}${r.rows_affected} linha(s) afetada(s) em ${r.duration_ms} ms`);
         }
@@ -235,11 +315,147 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     }
   };
 
+  const writeBlob = (name: string, content: string) => {
+    const blob = new Blob([content], { type: 'text/sql;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const performSave = async (handle: FileHandleLike | null, suggestedName?: string) => {
+    const targetName = handle?.name || suggestedName || filename || 'query.sql';
+    try {
+      if (handle) {
+        const writable = await handle.createWritable();
+        await writable.write(sqlText);
+        await writable.close();
+      } else {
+        writeBlob(targetName, sqlText);
+      }
+      fileHandleRef.current = handle;
+      setFilename(targetName);
+      lastSavedSqlRef.current = sqlText;
+      updateDirty(sqlText);
+      pushMessage(`Arquivo salvo: ${targetName}`);
+      setTab('messages');
+    } catch (err) {
+      setError(`Falha ao salvar: ${(err as Error).message}`);
+      setTab('messages');
+    }
+  };
+
+  const saveFile = async () => {
+    const fs = window as WindowWithFS;
+    if (fileHandleRef.current) {
+      await performSave(fileHandleRef.current);
+      return;
+    }
+    await saveFileAs();
+  };
+
+  const saveFileAs = async () => {
+    const fs = window as WindowWithFS;
+    const suggestedName = filename || 'query.sql';
+    try {
+      if (fs.showSaveFilePicker) {
+        const handle = await fs.showSaveFilePicker({
+          suggestedName,
+          types: [{ description: 'SQL', accept: { 'text/sql': ['.sql'], 'text/plain': ['.txt'] } }],
+        });
+        await performSave(handle, handle.name || suggestedName);
+      } else {
+        performSave(null, suggestedName);
+      }
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
+      setError(`Falha ao salvar: ${(err as Error).message}`);
+      setTab('messages');
+    }
+  };
+
+  const loadFromFile = (name: string, content: string, handle: FileHandleLike | null) => {
+    setSqlText(content);
+    lastSavedSqlRef.current = content;
+    dirtyRef.current = false;
+    fileHandleRef.current = handle;
+    setFilename(name);
+    if (onTitleChange) onTitleChange(name);
+  };
+
+  const openFile = async () => {
+    const fs = window as WindowWithFS;
+    try {
+      if (fs.showOpenFilePicker) {
+        const [handle] = await fs.showOpenFilePicker({
+          multiple: false,
+          types: [{ description: 'SQL', accept: { 'text/sql': ['.sql'], 'text/plain': ['.txt'] } }],
+        });
+        const file = await handle.getFile();
+        const content = await file.text();
+        loadFromFile(file.name, content, handle);
+      } else if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
+      setError(`Falha ao abrir: ${(err as Error).message}`);
+      setTab('messages');
+    }
+  };
+
+  const onFallbackFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const content = await file.text();
+    loadFromFile(file.name, content, null);
+  };
+
+  const newFile = () => {
+    if (dirtyRef.current && !window.confirm('Descartar alterações não salvas?')) return;
+    setSqlText('');
+    lastSavedSqlRef.current = '';
+    dirtyRef.current = false;
+    fileHandleRef.current = null;
+    setFilename(null);
+    setResults([]);
+    setMessages([]);
+    setError(null);
+    if (onTitleChange) onTitleChange('Query Tool');
+  };
+
+  const clear = () => { setSqlText(''); setResults([]); setError(null); setMessages([]); };
+  const toggleHistory = () => setHistoryOpen((v) => !v);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'F5') {
         e.preventDefault();
+        e.stopPropagation();
         run('execute');
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        saveFileAs();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        saveFile();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault();
+        openFile();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        newFile();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R')) {
@@ -247,9 +463,20 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
         setShowResults((v) => !v);
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [run]);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [run, saveFile, saveFileAs, openFile, newFile]);
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
 
   const extensions = useMemo(() => [
     sql({ dialect: PostgreSQL, schema, defaultSchema, upperCaseKeywords: true }),
@@ -261,6 +488,9 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     EditorView.lineWrapping,
     ssmsTheme,
     keymap.of([{
+      key: 'F5',
+      run: () => { run('execute'); return true; },
+    }, {
       key: 'Mod-Enter',
       run: () => { run('execute'); return true; },
     }, {
@@ -295,14 +525,51 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     }]),
   ], [schema, defaultSchema, run, formatSql]);
 
-  const clear = () => { setSqlText(''); setResults([]); setError(null); setMessages([]); };
-  const toggleHistory = () => setHistoryOpen((v) => !v);
-  useImperativeHandle(ref, () => ({ run, format: formatSql, clear, toggleHistory, gotoLine: openGotoLine, toggleComment: toggleCommentSelection, uppercase: uppercaseSelection, lowercase: lowercaseSelection }), [run, formatSql, clear, toggleHistory, openGotoLine, toggleCommentSelection, uppercaseSelection, lowercaseSelection]);
+  useImperativeHandle(ref, () => ({
+    run,
+    format: formatSql,
+    clear,
+    toggleHistory,
+    gotoLine: openGotoLine,
+    toggleComment: toggleCommentSelection,
+    uppercase: uppercaseSelection,
+    lowercase: lowercaseSelection,
+    openFile,
+    saveFile,
+    saveFileAs,
+    newFile,
+    getTitle: () => filename || 'Query Tool',
+    isDirty: () => dirtyRef.current,
+    requestClose: () => {
+      if (!dirtyRef.current) return true;
+      return window.confirm('Existem alterações não salvas. Fechar mesmo assim?');
+    },
+  }), [run, formatSql, clear, toggleHistory, openGotoLine, toggleCommentSelection, uppercaseSelection, lowercaseSelection, openFile, saveFile, saveFileAs, newFile, filename]);
+
+  useEffect(() => {
+    if (!tabId || !onCloseRequest) return;
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ tabId: string }>;
+      if (ce.detail?.tabId === tabId) {
+        if (dirtyRef.current && !window.confirm('Existem alterações não salvas. Fechar mesmo assim?')) return;
+        onCloseRequest(tabId);
+      }
+    };
+    window.addEventListener('pgms:close-tab', handler);
+    return () => window.removeEventListener('pgms:close-tab', handler);
+  }, [tabId, onCloseRequest]);
 
   const totalRows = results.reduce((n, r) => n + r.rows.length, 0);
 
   return (
     <div className="flex h-full w-full flex-col">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".sql,.txt,text/sql,text/plain"
+        className="hidden"
+        onChange={onFallbackFileChange}
+      />
       {historyOpen && (
         <div className="max-h-[180px] shrink-0 overflow-auto border-b border-border bg-[#fafafa]">
           <div className="flex items-center justify-between border-b border-[#eee] px-2.5 py-1">
@@ -338,18 +605,22 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
           {tab === 'results' && (
             results.length > 0 ? (
               <div className="flex flex-col gap-1.5 p-1.5">
-                {results.map((r, i) => (
-                  <div key={i} className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-border">
-                    <div className="flex shrink-0 items-center justify-between border-b border-border bg-[#f0f2f5] px-2.5 py-1">
-                      <span className="text-[12px] font-medium text-muted">
-                        {results.length > 1 ? `Resultado ${i + 1}` : 'Resultado'}
-                        {r.columns.length > 0 ? ` — ${r.rows.length} linha(s)` : ` — ${r.rows_affected} linha(s) afetada(s)`}
-                      </span>
-                      <span className="text-[11px] text-muted">{r.duration_ms} ms</span>
+                {results.map((r, i) => {
+                  const rows = r.rows ?? [];
+                  const columns = r.columns ?? [];
+                  return (
+                    <div key={i} className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-border">
+                      <div className="flex shrink-0 items-center justify-between border-b border-border bg-[#f0f2f5] px-2.5 py-1">
+                        <span className="text-[12px] font-medium text-muted">
+                          {results.length > 1 ? `Resultado ${i + 1}` : 'Resultado'}
+                          {columns.length > 0 ? ` — ${rows.length} linha(s)` : ` — ${r.rows_affected} linha(s) afetada(s)`}
+                        </span>
+                        <span className="text-[11px] text-muted">{r.duration_ms} ms</span>
+                      </div>
+                      <DataTable headers={columns} rows={rows.map((row) => (row ?? []).map((c) => String(c ?? '')))} withRowNumbers selectable />
                     </div>
-                    <DataTable headers={r.columns} rows={r.rows.map((row) => row.map((c) => String(c)))} withRowNumbers />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="p-5 italic text-muted">Execute uma query para ver os resultados.</div>
@@ -383,6 +654,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
 
       <div className="shrink-0 border-t border-border-soft bg-[#f4f6f8] px-2.5 py-1 text-xs text-muted">
         {selectedServer ? `${selectedServer.name} / ${database}` : 'Selecione um servidor'}
+        {filename && ` • ${filename}${dirtyRef.current ? ' (modificado)' : ''}`}
         {results.length > 0 && ` • ${results.reduce((t, r) => t + r.duration_ms, 0)} ms`}
         {running && ' • executando...'}
       </div>

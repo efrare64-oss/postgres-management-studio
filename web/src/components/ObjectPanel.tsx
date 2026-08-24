@@ -469,17 +469,180 @@ function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function DataTable({ headers, rows, withRowNumbers }: { headers: string[]; rows: React.ReactNode[][]; withRowNumbers?: boolean }) {
+export function DataTable({
+  headers,
+  rows,
+  withRowNumbers,
+  selectable,
+}: {
+  headers: string[];
+  rows: React.ReactNode[][];
+  withRowNumbers?: boolean;
+  selectable?: boolean;
+}) {
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [anchor, setAnchor] = useState<number | null>(null);
+  const [copyHint, setCopyHint] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; rowIdx: number | null } | null>(null);
+
+  const cellText = (cell: React.ReactNode): string => {
+    if (cell === null || cell === undefined) return '';
+    if (typeof cell === 'string' || typeof cell === 'number' || typeof cell === 'boolean') return String(cell);
+    return String(cell);
+  };
+
+  const rowsAsText = (idxs: number[], includeHeader: boolean, sep: string) => {
+    const lines: string[] = [];
+    if (includeHeader) lines.push(headers.map((h) => h.includes(sep) ? `"${h.replace(/"/g, '""')}"` : h).join(sep));
+    for (const i of idxs) {
+      const row = rows[i] || [];
+      lines.push(row.map((c) => {
+        const s = cellText(c);
+        return s.includes(sep) || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(sep));
+    }
+    return lines.join('\n');
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+  };
+
+  const handleCopy = async (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || (target as HTMLElement).isContentEditable)) {
+      return;
+    }
+    const idxs = selected.size > 0 ? Array.from(selected).sort((a, b) => a - b) : rows.map((_, i) => i);
+    const withHeader = e.shiftKey;
+    const text = rowsAsText(idxs, withHeader, '\t');
+    e.preventDefault();
+    await copyToClipboard(text);
+    setCopyHint(withHeader
+      ? `${idxs.length} linha(s) copiada(s) com cabeçalho`
+      : `${idxs.length} linha(s) copiada(s)`);
+    window.setTimeout(() => setCopyHint(null), 2000);
+  };
+
+  const onRowClick = (e: React.MouseEvent, idx: number) => {
+    if (!selectable) return;
+    if (e.shiftKey && anchor != null) {
+      const lo = Math.min(anchor, idx);
+      const hi = Math.max(anchor, idx);
+      const next = new Set<number>();
+      for (let i = lo; i <= hi; i++) next.add(i);
+      setSelected(next);
+    } else if (e.ctrlKey || e.metaKey) {
+      const next = new Set(selected);
+      next.has(idx) ? next.delete(idx) : next.add(idx);
+      setSelected(next);
+      setAnchor(idx);
+    } else {
+      const next = new Set<number>();
+      next.add(idx);
+      setSelected(next);
+      setAnchor(idx);
+    }
+  };
+
+  const onContextMenu = (e: React.MouseEvent, rowIdx: number | null) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, rowIdx });
+  };
+
+  const handleContextAction = async (action: 'copy' | 'copyHeader') => {
+    if (!contextMenu) return;
+    const idxs = contextMenu.rowIdx !== null
+      ? [contextMenu.rowIdx]
+      : selected.size > 0
+        ? Array.from(selected).sort((a, b) => a - b)
+        : rows.map((_, i) => i);
+    const withHeader = action === 'copyHeader';
+    const text = rowsAsText(idxs, withHeader, '\t');
+    await copyToClipboard(text);
+    setCopyHint(withHeader
+      ? `${idxs.length} linha(s) copiada(s) com cabeçalho`
+      : `${idxs.length} linha(s) copiada(s)`);
+    setContextMenu(null);
+    window.setTimeout(() => setCopyHint(null), 2000);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!selectable) return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+      handleCopy(e.nativeEvent);
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+      e.preventDefault();
+      const next = new Set(rows.map((_, i) => i));
+      setSelected(next);
+    }
+  };
+
   return (
-    <div className="max-h-full overflow-auto border border-border bg-panel-bg">
-      <table className="border-collapse text-[13px]">
-        <thead><tr>{withRowNumbers && <th className="sticky top-0 z-10 w-[44px] border border-border whitespace-nowrap bg-[#f0f2f5] px-2 py-1 text-right text-muted">#</th>}{headers.map((h) => <th key={h} className="sticky top-0 z-10 border border-border whitespace-nowrap bg-[#f0f2f5] px-2 py-1 text-left">{h}</th>)}</tr></thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="hover:bg-hover">{withRowNumbers && <td className="whitespace-nowrap border border-[#e2e5e9] bg-[#fafafa] px-2 py-1 text-right font-mono text-muted">{i + 1}</td>}{row.map((cell, j) => <td key={j} className="whitespace-nowrap border border-[#e2e5e9] px-2 py-1 font-mono">{cell === null || cell === undefined ? '' : cell}</td>)}</tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="flex max-h-full min-h-0 flex-col" tabIndex={selectable ? 0 : -1} onKeyDown={onKeyDown} onContextMenu={(e) => onContextMenu(e, null)}>
+      {selectable && copyHint && (
+        <div className="shrink-0 border-b border-border bg-[#eef7ee] px-2.5 py-1 text-[12px] text-[#1a5a1a]">{copyHint}</div>
+      )}
+      <div className="max-h-full min-h-0 flex-1 overflow-auto border border-border bg-panel-bg">
+        <table className="border-collapse text-[13px]">
+          <thead><tr>{withRowNumbers && <th className="sticky top-0 z-10 w-[44px] border border-border whitespace-nowrap bg-[#f0f2f5] px-2 py-1 text-right text-muted">#</th>}{headers.map((h) => <th key={h} className="sticky top-0 z-10 border border-border whitespace-nowrap bg-[#f0f2f5] px-2 py-1 text-left">{h}</th>)}</tr></thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const isSelected = selectable && selected.has(i);
+              return (
+                <tr
+                  key={i}
+                  className={`${selectable ? 'cursor-pointer' : ''} ${isSelected ? 'bg-[#cfe0ef] hover:bg-[#cfe0ef]' : 'hover:bg-hover'}`}
+                  onClick={(e) => onRowClick(e, i)}
+                  onContextMenu={(e) => onContextMenu(e, i)}
+                >
+                  {withRowNumbers && <td className="whitespace-nowrap border border-[#e2e5e9] bg-[#fafafa] px-2 py-1 text-right font-mono text-muted">{i + 1}</td>}
+                  {row.map((cell, j) => <td key={j} className="whitespace-nowrap border border-[#e2e5e9] px-2 py-1 font-mono">{cell === null || cell === undefined ? '' : cell}</td>)}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-[180px] rounded border border-border bg-white py-1 shadow-lg"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onMouseLeave={() => setContextMenu(null)}
+        >
+          <button
+            className="flex w-full cursor-pointer items-center gap-2 border-none bg-transparent px-3 py-1.5 text-left text-[13px] hover:bg-[#e8edf2]"
+            onClick={() => handleContextAction('copy')}
+          >
+            Copiar
+          </button>
+          <button
+            className="flex w-full cursor-pointer items-center gap-2 border-none bg-transparent px-3 py-1.5 text-left text-[13px] hover:bg-[#e8edf2]"
+            onClick={() => handleContextAction('copyHeader')}
+          >
+            Copiar com cabeçalho
+          </button>
+        </div>
+      )}
+      {selectable && (
+        <div className="shrink-0 border-t border-border bg-[#f4f6f8] px-2.5 py-1 text-[11px] text-muted">
+          {selected.size > 0 ? `${selected.size} linha(s) selecionada(s)` : `${rows.length} linha(s)`}
+          {' • '}
+          Ctrl+C: copiar • Ctrl+Shift+C: copiar com cabeçalho • Ctrl+A: selecionar tudo
+        </div>
+      )}
     </div>
   );
 }

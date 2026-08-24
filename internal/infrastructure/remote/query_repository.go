@@ -3,10 +3,12 @@ package remote
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"postgres-management-studio/internal/domain/connection"
 	"postgres-management-studio/internal/domain/query"
@@ -81,7 +83,7 @@ func (r *QueryRepository) collect(start time.Time, rows pgx.Rows) (*query.Result
 		columns[i] = f.Name
 	}
 
-	var result [][]any
+	result := make([][]any, 0)
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
@@ -113,6 +115,52 @@ func normalizeCell(v any) any {
 		return formatUUID(t)
 	case []byte:
 		return string(t)
+	case pgtype.Numeric:
+		if !t.Valid {
+			return nil
+		}
+		s, err := t.Value()
+		if err != nil {
+			return fmt.Sprintf("%v", t)
+		}
+		return s
+	case pgtype.UUID:
+		if !t.Valid {
+			return nil
+		}
+		return formatUUID(t.Bytes)
+	case pgtype.Date:
+		if !t.Valid {
+			return nil
+		}
+		return t.Time.Format("2006-01-02")
+	case pgtype.Timestamp:
+		if !t.Valid {
+			return nil
+		}
+		return t.Time.Format("2006-01-02 15:04:05")
+	case pgtype.Timestamptz:
+		if !t.Valid {
+			return nil
+		}
+		return t.Time.Format("2006-01-02 15:04:05 -0700")
+	case pgtype.Interval:
+		if !t.Valid {
+			return nil
+		}
+		return fmt.Sprintf("%d months %d days %d seconds", t.Months, t.Days, t.Microseconds/1000000)
+	case pgtype.Range[pgtype.Int4]:
+		return fmt.Sprintf("[%d,%d)", t.Lower, t.Upper)
+	case pgtype.Range[pgtype.Int8]:
+		return fmt.Sprintf("[%d,%d)", t.Lower, t.Upper)
+	case pgtype.Range[pgtype.Numeric]:
+		return fmt.Sprintf("[any,any)")
+	case net.IPNet:
+		return t.String()
+	case net.HardwareAddr:
+		return t.String()
+	case net.IP:
+		return t.String()
 	default:
 		return v
 	}

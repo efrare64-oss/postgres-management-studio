@@ -1,6 +1,6 @@
 module postgres-management-studio
 
-go 1.26.5
+go 1.27.0
 
 require (
 	github.com/gin-gonic/gin v1.12.0

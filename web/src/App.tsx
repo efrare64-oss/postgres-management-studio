@@ -110,22 +110,24 @@ export default function App() {
       .then((dbs) => {
         if (cancelled) return;
         setQueryDatabases(dbs);
-        const selected = queryDatabase && dbs.some((d) => d.name === queryDatabase)
-          ? queryDatabase
-          : dbs[0]?.name || '';
-        if (selected !== queryDatabase) {
-          setQueryDatabase(selected);
-          if (activeQueryTab) {
-            updateQueryTabContext(activeQueryTab.id, { serverId: Number(queryServerId), database: selected });
-          }
-        }
+        setQueryDatabase((prev) => {
+          if (prev && dbs.some((d) => d.name === prev)) return prev;
+          return dbs[0]?.name || '';
+        });
       })
       .catch(() => {
         if (!cancelled) setQueryDatabases([]);
       });
 
     return () => { cancelled = true; };
-  }, [queryServerId, queryDatabase, activeQueryTab]);
+  }, [queryServerId]);
+
+  useEffect(() => {
+    if (!activeQueryTab || !queryDatabase) return;
+    if (activeQueryTab.context?.database !== queryDatabase) {
+      updateQueryTabContext(activeQueryTab.id, { serverId: activeQueryTab.context?.serverId ?? null, database: queryDatabase });
+    }
+  }, [activeQueryTab?.id, queryDatabase]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -788,6 +790,10 @@ export default function App() {
               onLowercase={() => activeTab && queryRefs.current[activeTab]?.lowercase()}
               onClear={() => activeTab && queryRefs.current[activeTab]?.clear()}
               onToggleHistory={() => activeTab && queryRefs.current[activeTab]?.toggleHistory()}
+              onNew={() => activeTab && queryRefs.current[activeTab]?.newFile()}
+              onOpen={() => activeTab && queryRefs.current[activeTab]?.openFile()}
+              onSave={() => activeTab && queryRefs.current[activeTab]?.saveFile()}
+              onSaveAs={() => activeTab && queryRefs.current[activeTab]?.saveFileAs()}
             />
           )}
           {tabs.length === 0 ? (
@@ -813,6 +819,9 @@ export default function App() {
                         onServerChange={setActiveQueryServer}
                         onDatabaseChange={setActiveQueryDatabase}
                         onRunningChange={setQueryRunning}
+                        onTitleChange={(title) => setTabs((ts) => ts.map((tab) => tab.id === t.id ? { ...tab, title } : tab))}
+                        onCloseRequest={closeTab}
+                        tabId={t.id}
                       />
                     ) : (
                       <ObjectPanel node={t.node!} kind={t.kind} />

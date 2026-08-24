@@ -19,6 +19,10 @@ interface QueryToolbarProps {
   onLowercase: () => void;
   onClear: () => void;
   onToggleHistory: () => void;
+  onNew: () => void;
+  onOpen: () => void;
+  onSave: () => void;
+  onSaveAs: () => void;
 }
 
 export default function QueryToolbar({
@@ -39,6 +43,10 @@ export default function QueryToolbar({
   onLowercase,
   onClear,
   onToggleHistory,
+  onNew,
+  onOpen,
+  onSave,
+  onSaveAs,
 }: QueryToolbarProps) {
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border-soft bg-[#f4f6f8] px-2.5 py-1.5">
@@ -54,7 +62,20 @@ export default function QueryToolbar({
         </select>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        <button className="btn primary" disabled={running} onClick={onExecute} title="Executar">
+        <button className="btn" onClick={onNew} title="Novo (Ctrl+N)">
+          <Fa name="plus" />
+        </button>
+        <button className="btn" onClick={onOpen} title="Abrir arquivo SQL (Ctrl+O)">
+          <Fa name="upload" />
+        </button>
+        <button className="btn" onClick={onSave} title="Salvar (Ctrl+S)">
+          <Fa name="save" />
+        </button>
+        <button className="btn" onClick={onSaveAs} title="Salvar como (Ctrl+Shift+S)">
+          <Fa name="backup" />
+        </button>
+        <span className="mx-1 inline-block w-px self-stretch bg-border" />
+        <button className="btn primary" disabled={running} onClick={onExecute} title="Executar (F5)">
           <Fa name="sql" />
         </button>
         <button className="btn" disabled={running} onClick={onExplain} title="EXPLAIN">
@@ -63,6 +84,7 @@ export default function QueryToolbar({
         <button className="btn" disabled={running} onClick={onExplainAnalyze} title="EXPLAIN ANALYZE">
           <Fa name="explain-analyze" />
         </button>
+        <span className="mx-1 inline-block w-px self-stretch bg-border" />
         <button className="btn" onClick={onFormat} title="Formatar SQL">
           <Fa name="format" />
         </button>
