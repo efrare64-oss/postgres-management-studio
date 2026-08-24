@@ -2,6 +2,8 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
+
+	"postgres-management-studio/internal/infrastructure/remote"
 )
 
 func (h *ClusterHandler) listViews(c *gin.Context) {
@@ -145,4 +147,37 @@ func (h *ClusterHandler) databaseDashboard(c *gin.Context) {
 		return
 	}
 	OK(c, out)
+}
+
+func (h *ClusterHandler) startMetrics(c *gin.Context) {
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	db := c.Param("database")
+	params, err := h.service.GetDatabaseParams(c.Request.Context(), id, db)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	remote.StartMetricsCollection(id, db, h.conn, params)
+	OK(c, gin.H{"status": "started"})
+}
+
+func (h *ClusterHandler) stopMetrics(c *gin.Context) {
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	remote.StopMetricsCollection(id)
+	OK(c, gin.H{"status": "stopped"})
+}
+
+func (h *ClusterHandler) getMetricsHistory(c *gin.Context) {
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	history := remote.GetMetricsHistory(id)
+	OK(c, history)
 }

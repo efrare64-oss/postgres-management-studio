@@ -252,6 +252,22 @@ func (s *Service) GetDatabaseDashboard(ctx context.Context, serverID int64, data
 	return out, err
 }
 
+func (s *Service) GetServerParams(ctx context.Context, serverID int64) (connection.Params, error) {
+	svr, err := s.servers.FindByID(ctx, serverID)
+	if err != nil {
+		return connection.Params{}, err
+	}
+	return s.params(svr, svr.Database), nil
+}
+
+func (s *Service) GetDatabaseParams(ctx context.Context, serverID int64, database string) (connection.Params, error) {
+	svr, err := s.servers.FindByID(ctx, serverID)
+	if err != nil {
+		return connection.Params{}, err
+	}
+	return s.params(svr, database), nil
+}
+
 // ---------------------------------------------------------------------------
 // Data grid
 // ---------------------------------------------------------------------------

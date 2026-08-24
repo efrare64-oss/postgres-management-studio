@@ -110,6 +110,8 @@ const ICONS: Record<string, string> = {
   'replace-next': 'fa fa-arrow-down',
   'replace-all': 'fa fa-fast-forward',
   submenu: 'fa fa-caret-right',
+  moon: 'fa fa-moon-o',
+  sun: 'fa fa-sun-o',
 };
 
 function iconClass(name: string): string {

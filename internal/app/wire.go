@@ -34,7 +34,7 @@ func Wire(ctx context.Context, cfg *config.Config, frontend fs.FS) (*App, error)
 		return nil, fmt.Errorf("open studio database: %w", err)
 	}
 
-	connManagement := infradb.NewRemoteManagement()
+	connManagement := infradb.NewRemoteManagement(cfg.PoolMaxConns, cfg.PoolMinConns, cfg.PoolMaxLifeMin)
 
 	serverRepo := persistence.NewServerRepository(studioDB)
 	groupRepo := persistence.NewGroupRepository(studioDB)
@@ -48,7 +48,7 @@ func Wire(ctx context.Context, cfg *config.Config, frontend fs.FS) (*App, error)
 	querySvc := appquery.NewService(serverRepo, queryRepo, connManagement, queryHistoryRepo)
 	toolsSvc := apptools.NewService(serverRepo, cfg)
 
-	srv := httpserver.New(serverSvc, clusterSvc, querySvc, groupSvc, toolsSvc, frontend)
+	srv := httpserver.New(serverSvc, clusterSvc, querySvc, groupSvc, toolsSvc, connManagement, frontend)
 
 	return &App{
 		Server: srv,

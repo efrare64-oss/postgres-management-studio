@@ -1,6 +1,6 @@
 import type {
   ActionResult, AddColumnInput, AlterColumnInput, BackupOptions, CatalogObject, ColumnStat, CompletionTable, ConstraintInput, CountResult, CSVImportResult, DataSaveResult, DatabaseDashboard,
-  DatabaseInfo, Dependency, Dependent, FunctionInput, GrantInput, HistoryItem, IndexInput, Lock, Policy, PolicyInput, ProcedureInput, QueryBatch,
+  DatabaseInfo, Dependency, Dependent, FunctionInput, GrantInput, HistoryItem, IndexInput, Lock, MetricsHistory, Policy, PolicyInput, ProcedureInput, QueryBatch,
   RestoreOptions, Role, Rule, RuleInput, SchemaInfo, SearchObject, SequenceInput, ServerDashboard, Setting, SqlText, StudioServer,
   ServerGroup, ServerExport, TableData, TableDataSave, TableDetail, TableStats, ToolBinary, Trigger, TriggerInput,
 } from './types';
@@ -271,4 +271,13 @@ export const api = {
     const data = (await res.json().catch(() => ({}))) as ApiEnvelope;
     if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
   },
+
+  startMetrics: (serverId: number, db: string) =>
+    api.post(`/servers/${serverId}/databases/${encodeURIComponent(db)}/metrics/start`, {}),
+
+  stopMetrics: (serverId: number) =>
+    api.post(`/servers/${serverId}/metrics/stop`, {}),
+
+  metricsHistory: (serverId: number) =>
+    api.get<MetricsHistory>(`/servers/${serverId}/metrics/history`),
 };

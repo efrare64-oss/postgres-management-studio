@@ -35,16 +35,20 @@ func (c *pooledConn) Close() {
 }
 
 type RemoteManagement struct {
-	ttl   time.Duration
-	mu    sync.Mutex
-	pools sync.Map
-	stop  chan struct{}
+	ttl        time.Duration
+	maxConns   int32
+	minConns   int32
+	mu         sync.Mutex
+	pools      sync.Map
+	stop       chan struct{}
 }
 
-func NewRemoteManagement() *RemoteManagement {
+func NewRemoteManagement(maxConns, minConns, maxLifeMin int) *RemoteManagement {
 	m := &RemoteManagement{
-		ttl:  5 * time.Minute,
-		stop: make(chan struct{}),
+		ttl:      time.Duration(maxLifeMin) * time.Minute,
+		maxConns: int32(maxConns),
+		minConns: int32(minConns),
+		stop:     make(chan struct{}),
 	}
 	go m.cleanup()
 	return m
@@ -70,7 +74,16 @@ func (m *RemoteManagement) TestConnection(ctx context.Context, p connection.Para
 	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.New(pingCtx, m.dsn(p))
+	cfg, err := pgxpool.ParseConfig(m.dsn(p))
+	if err != nil {
+		return err
+	}
+	cfg.MaxConns = m.maxConns
+	cfg.MinConns = m.minConns
+	cfg.MaxConnLifetime = m.ttl
+	cfg.MaxConnIdleTime = 5 * time.Minute
+
+	pool, err := pgxpool.NewWithConfig(pingCtx, cfg)
 	if err != nil {
 		return err
 	}
@@ -102,7 +115,16 @@ func (m *RemoteManagement) poolFor(ctx context.Context, p connection.Params) (*p
 		m.pools.Delete(dsn)
 	}
 
-	pool, err := pgxpool.New(ctx, dsn)
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parse dsn: %w", err)
+	}
+	cfg.MaxConns = m.maxConns
+	cfg.MinConns = m.minConns
+	cfg.MaxConnLifetime = m.ttl
+	cfg.MaxConnIdleTime = 5 * time.Minute
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create pool: %w", err)
 	}

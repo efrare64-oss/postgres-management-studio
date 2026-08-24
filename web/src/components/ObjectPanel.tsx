@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Fa } from '../icons';
 import DataGrid from './DataGrid';
+import PerformanceView from './PerformanceView';
 import type { Dependency, Dependent, TreeNode } from '../types';
 
 const OBJECT_KINDS: Record<string, string> = {
@@ -368,7 +369,7 @@ function DatabaseDashboard({ node }: { node: TreeNode }) {
 }
 
 function DashboardExtras({ serverId, database }: { serverId: number; database?: string }) {
-  const [tab, setTab] = useState<'locks' | 'settings'>('locks');
+  const [tab, setTab] = useState<'locks' | 'settings' | 'performance'>('locks');
   const locks = useFetch(() => api.locks(serverId, database || 'postgres'), [serverId, database]);
   const settings = useFetch(() => api.settings(serverId, database || 'postgres'), [serverId, database]);
 
@@ -387,6 +388,9 @@ function DashboardExtras({ serverId, database }: { serverId: number; database?: 
         </button>
         <button className={`cursor-pointer border-none border-r border-border px-3 py-1 text-[13px] hover:bg-[#d7dbe1] ${tab === 'settings' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('settings')}>
           Configurações
+        </button>
+        <button className={`cursor-pointer border-none border-r border-border px-3 py-1 text-[13px] hover:bg-[#d7dbe1] ${tab === 'performance' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('performance')}>
+          Performance
         </button>
       </div>
       <div className="mt-2">
@@ -408,6 +412,9 @@ function DashboardExtras({ serverId, database }: { serverId: number; database?: 
             headers={['Name', 'Value', 'Unit', 'Context', 'Description']}
             rows={(settings.data || []).map((s) => [s.name, s.value, s.unit, s.context, s.description])}
           />
+        )}
+        {tab === 'performance' && (
+          <PerformanceView serverId={serverId} database={database || 'postgres'} />
         )}
       </div>
     </div>

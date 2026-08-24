@@ -7,14 +7,16 @@ import (
 
 	appcluster "postgres-management-studio/internal/application/cluster"
 	"postgres-management-studio/internal/domain/cluster"
+	"postgres-management-studio/internal/domain/connection"
 )
 
 type ClusterHandler struct {
 	service *appcluster.Service
+	conn    connection.Provider
 }
 
-func NewClusterHandler(service *appcluster.Service) *ClusterHandler {
-	return &ClusterHandler{service: service}
+func NewClusterHandler(service *appcluster.Service, conn connection.Provider) *ClusterHandler {
+	return &ClusterHandler{service: service, conn: conn}
 }
 
 func (h *ClusterHandler) Register(r *gin.RouterGroup) {
@@ -47,6 +49,11 @@ func (h *ClusterHandler) Register(r *gin.RouterGroup) {
 	r.POST("/servers/:id/roles", h.createRole)
 	r.PATCH("/servers/:id/roles/:name", h.alterRole)
 	r.DELETE("/servers/:id/roles/:name", h.dropRole)
+
+	// Metrics
+	r.POST("/servers/:id/databases/:database/metrics/start", h.startMetrics)
+	r.POST("/servers/:id/metrics/stop", h.stopMetrics)
+	r.GET("/servers/:id/metrics/history", h.getMetricsHistory)
 
 	h.registerActions(r)
 	h.registerCRUD(r)

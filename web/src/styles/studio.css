@@ -25,6 +25,69 @@
   --color-editor-bg: #1e1e1e;
 }
 
+/* ---------- Dark mode overrides ---------- */
+.dark {
+  --color-pg-bg: #1a1d23;
+  --color-panel-bg: #22262e;
+  --color-border: #3a3f4a;
+  --color-border-soft: #2e323a;
+  --color-text: #e0e4e8;
+  --color-muted: #9ca3af;
+  --color-menu-bg: #2a2e36;
+  --color-menu-border: #3a3f4a;
+  --color-toolbar-bg: #282c34;
+  --color-tb-hover: #333840;
+  --color-selected: #264a6d;
+  --color-hover: #2a3040;
+  --color-tab-bg: #2e323a;
+  --color-danger: #f87171;
+  --color-editor-bg: #1a1d23;
+
+  /* Buttons */
+  --color-btn-bg: #2e323a;
+  --color-btn-hover: #3a3f4a;
+  --color-btn-disabled: #2e323a;
+
+  /* Forms */
+  --color-input-bg: #2a2e36;
+  --color-input-border: #3a3f4a;
+  --color-input-focus: #326690;
+
+  /* Dropdown */
+  --color-dropdown-hover: #2a3040;
+
+  /* Modal */
+  --color-modal-header-bg: #2a2e36;
+
+  /* Status bar */
+  --color-status-bg: #282c34;
+
+  /* Context menu */
+  --color-ctx-bg: #2a2e36;
+  --color-ctx-hover: #333840;
+  --color-ctx-border: #3a3f4a;
+
+  /* Table */
+  --color-table-header-bg: #2e323a;
+  --color-table-border: #3a3f4a;
+  --color-table-row-bg: #22262e;
+  --color-table-row-hover: #2a3040;
+  --color-table-selected: #264a6d;
+  --color-table-alt: #282c34;
+
+  /* Messages */
+  --color-msg-success-bg: #1a2e1a;
+  --color-msg-success-border: #2a4a2a;
+  --color-msg-success-text: #6aaf6a;
+  --color-msg-error-bg: #2e1a1a;
+  --color-msg-error-border: #4a2a2a;
+  --color-msg-error-text: #f87171;
+
+  /* Search panel */
+  --color-search-bg: #282c34;
+  --color-search-header: #2a2e36;
+}
+
 @layer base {
   html, body, #root { height: 100%; }
 
@@ -111,3 +174,78 @@
 
 /* ---------- Query tool / CodeMirror ---------- */
 .query-editor .cm-editor { font-size: 14px; }
+
+/* ---------- Dark mode component overrides ---------- */
+.dark .btn { background: var(--color-btn-bg); border-color: var(--color-border); }
+.dark .btn:hover:not(:disabled) { background: var(--color-btn-hover); }
+.dark .btn:disabled { background: var(--color-btn-disabled); }
+
+.dark .form-row input,
+.dark .form-row select { background: var(--color-input-bg); border-color: var(--color-input-border); color: var(--color-text); }
+.dark .form-row input:focus,
+.dark .form-row select:focus { border-color: var(--color-input-focus); }
+
+.dark .dropdown-item:hover { background: var(--color-dropdown-hover); }
+.dark .dropdown-sep { background: var(--color-border); }
+
+.dark .modal { background: var(--color-panel-bg); border-color: var(--color-border); }
+.dark .modal-header { background: var(--color-modal-header-bg); }
+
+.dark table th { background: var(--color-table-header-bg); }
+.dark table td { border-color: var(--color-table-border); }
+.dark table tr:hover { background: var(--color-table-row-hover); }
+
+.dark .cm-editor { background: var(--color-editor-bg); }
+.dark .cm-gutters { background: var(--color-panel-bg); border-color: var(--color-border); color: var(--color-muted); }
+.dark .cm-activeLineGutter { background: var(--color-tb-hover); }
+.dark .cm-activeLine { background: var(--color-hover); }
+.dark .cm-selectionBackground { background: var(--color-selected) !important; }
+.dark .cm-cursor { border-color: var(--color-text); }
+
+.dark pre { background: var(--color-panel-bg); border-color: var(--color-border); color: var(--color-text); }
+.dark code { background: var(--color-tb-hover); padding: 0.1em 0.3em; border-radius: 3px; }
+.dark pre code { background: transparent; padding: 0; }
+
+.dark ::selection { background: var(--color-selected); }
+.dark ::-webkit-scrollbar { background: var(--color-panel-bg); }
+.dark ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
+
+.dark .bg-\[#f7f7f7\] { background: var(--color-btn-bg) !important; }
+.dark .bg-\[#f4f6f8\] { background: var(--color-status-bg) !important; }
+.dark .bg-\[#fafafa\] { background: var(--color-panel-bg) !important; }
+.dark .bg-\[#f0f2f5\] { background: var(--color-table-header-bg) !important; }
+.dark .bg-\[#eef0f3\] { background: var(--color-modal-header-bg) !important; }
+.dark .bg-\[#f5f6f8\] { background: var(--color-menu-bg) !important; }
+.dark .bg-\[#e2e5ea\] { background: var(--color-tab-bg) !important; }
+.dark .bg-\[#eef7ee\] { background: var(--color-msg-success-bg) !important; }
+.dark .bg-\[#fdecea\] { background: var(--color-msg-error-bg) !important; }
+.dark .bg-\[#e8edf2\] { background: var(--color-ctx-hover) !important; }
+.dark .bg-\[#e8eef5\] { background: var(--color-ctx-hover) !important; }
+
+.dark .text-\[#1f2937\] { color: var(--color-text) !important; }
+.dark .text-\[#374151\] { color: var(--color-text) !important; }
+.dark .text-\[#4a5560\] { color: var(--color-muted) !important; }
+.dark .text-\[#4b5563\] { color: var(--color-muted) !important; }
+.dark .text-\[#1a5a1a\] { color: var(--color-msg-success-text) !important; }
+.dark .text-\[#3a6ea5\] { color: #5a9ad4 !important; }
+.dark .text-\[#2f4156\] { color: var(--color-text) !important; }
+.dark .text-\[#7d858e\] { color: var(--color-muted) !important; }
+.dark .text-\[#8a919b\] { color: var(--color-muted) !important; }
+.dark .text-\[#c3c9d0\] { color: var(--color-muted) !important; }
+
+.dark .border-\[#e2e5e9\] { border-color: var(--color-table-border) !important; }
+.dark .border-\[#e5e5e5\] { border-color: var(--color-border) !important; }
+.dark .border-\[#eee\] { border-color: var(--color-border) !important; }
+.dark .border-\[#e3e6ea\] { border-color: var(--color-border) !important; }
+.dark .border-\[#e5b3b0\] { border-color: var(--color-msg-error-border) !important; }
+.dark .border-\[#cfe3cf\] { border-color: var(--color-msg-success-border) !important; }
+.dark .border-\[#b9c8d6\] { border-color: var(--color-border) !important; }
+
+.dark .hover\:bg-\[#d7dbe1\]:hover { background: var(--color-btn-hover) !important; }
+.dark .hover\:bg-\[#eceaea\]:hover { background: var(--color-btn-hover) !important; }
+.dark .hover\:bg-\[#ececec\]:hover { background: var(--color-btn-hover) !important; }
+.dark .hover\:bg-\[#e2e6ec\]:hover { background: var(--color-dropdown-hover) !important; }
+
+.dark .cm-editor { background: var(--color-editor-bg); }
+.dark .cm-theme-dark .cm-editor { background: var(--color-editor-bg); }

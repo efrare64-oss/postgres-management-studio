@@ -5,14 +5,14 @@
 **Gerenciador de servidores PostgreSQL com interface inspirada no pgAdmin 4.**
 **PostgreSQL server manager with a pgAdmin 4-inspired interface.**
 
-Versão 0.2.0 • Stack: Go, React + TypeScript + Vite
+Versão 0.3.0 • Stack: Go, React + TypeScript + Vite
 
 ![Go 1.27+](https://img.shields.io/badge/Go-1.27+-00ADD8)
 ![React 19+](https://img.shields.io/badge/React-19+-61DAFB)
 ![TypeScript 5+](https://img.shields.io/badge/TypeScript-5+-3178C6)
 ![Vite 8+](https://img.shields.io/badge/Vite-8+-646CFF)
 ![Tailwind CSS 4](https://img.shields.io/badge/Tailwind%20CSS-4-38BDF8)
-![Version v0.2.0](https://img.shields.io/badge/Version-v0.2.0-2b7489)
+![Version v0.2.0](https://img.shields.io/badge/Version-v0.3.0-2b7489)
 ![License MIT](https://img.shields.io/badge/License-MIT-007ec6)
 
 </div>
@@ -180,14 +180,16 @@ Contributions are very welcome! Please follow these steps:
 - ✅ Navegação por schemas e tabelas / Schema and table navigation
 - ✅ Query tool com múltiplos resultados / Query tool with multiple result grids
 - ✅ Exportação de dados (CSV) / Data export (CSV)
-- ⬜ Backup automático / Automatic backup
-- ⬜ Monitoramento de performance / Performance monitoring
-- ⬜ Temas dark/light / Dark/light themes
-- ⬜ Suporte a múltiplas conexões simultâneas / Support for multiple simultaneous connections
+- ✅ Backup automático / Automatic backup
+- ✅ Context menus com submenus / Context menus with submenus
+- ✅ Seleção e cópia de linhas no grid / Row selection and copy in grid
+- ✅ Monitoramento de performance / Performance monitoring
+- ✅ Temas dark/light / Dark/light themes
+- ✅ Suporte a múltiplas conexões simultâneas / Support for multiple simultaneous connections
 
 ## ⚠️ Problemas Conhecidos / Known Issues
 
-- Versão 0.2.0: Em desenvolvimento ativo / Version 0.2.0: under active development
+- Versão 0.3.0: Em desenvolvimento ativo / Version 0.3.0: under active development
 - Autocomplete no query executor ainda em beta / Query tool autocomplete is still in beta
 - Suporte limitado a roles e permissões / Limited support for roles and permissions
 

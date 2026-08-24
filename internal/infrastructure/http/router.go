@@ -16,6 +16,7 @@ import (
 	appquery "postgres-management-studio/internal/application/query"
 	appserver "postgres-management-studio/internal/application/server"
 	apptools "postgres-management-studio/internal/application/tools"
+	"postgres-management-studio/internal/domain/connection"
 	"postgres-management-studio/internal/infrastructure/http/handler"
 	"postgres-management-studio/internal/infrastructure/http/middleware"
 )
@@ -24,12 +25,12 @@ type Server struct {
 	engine *gin.Engine
 }
 
-func New(serverSvc *appserver.Service, clusterSvc *appcluster.Service, querySvc *appquery.Service, groupSvc *appgroup.Service, toolsSvc *apptools.Service, frontend fs.FS) *Server {
+func New(serverSvc *appserver.Service, clusterSvc *appcluster.Service, querySvc *appquery.Service, groupSvc *appgroup.Service, toolsSvc *apptools.Service, conn connection.Provider, frontend fs.FS) *Server {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery(), middleware.CORS())
 
 	serverH := handler.NewServerHandler(serverSvc)
-	clusterH := handler.NewClusterHandler(clusterSvc)
+	clusterH := handler.NewClusterHandler(clusterSvc, conn)
 	queryH := handler.NewQueryHandler(querySvc)
 	groupH := handler.NewGroupHandler(groupSvc)
 	toolsH := handler.NewToolsHandler(toolsSvc)

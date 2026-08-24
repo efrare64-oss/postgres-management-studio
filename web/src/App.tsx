@@ -1,5 +1,6 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
+import { ThemeProvider } from './contexts/ThemeContext';
 import Header from './components/Header';
 import MenuBar from './components/MenuBar';
 import Toolbar from './components/Toolbar';
@@ -732,8 +733,9 @@ export default function App() {
   );
 
   return (
+    <ThemeProvider>
     <div className="flex h-screen flex-col">
-      <Header version="v0.2.0" />
+      <Header version="v0.3.0" />
       <MenuBar items={menuItems} openMenu={openMenu} onOpenMenu={setOpenMenu} />
       <Toolbar items={toolbar} />
 
@@ -927,5 +929,6 @@ export default function App() {
         onOpenObject={handleSelect}
       />
     </div>
+    </ThemeProvider>
   );
 }

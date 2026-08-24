@@ -15,7 +15,7 @@ export default function AboutDialog({ onClose }: AboutDialogProps) {
             <p className="m-0 text-sm text-muted">Gerenciador de servidores PostgreSQL.</p>
           </div>
         </div>
-        <p>Versão 0.2.0 • Stack: Go, React + TypeScript + Vite 8. + Tailwind 4.</p>
+        <p>Versão 0.3.0 • Stack: Go, React + TypeScript + Vite 8. + Tailwind 4.</p>
       </div>
     </Modal>
   );

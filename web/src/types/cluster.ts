@@ -143,6 +143,32 @@ export interface DatabaseDashboard {
   sessions: Session[];
 }
 
+export interface MetricSnapshot {
+  timestamp: string;
+  total_conn: number;
+  active_queries: number;
+  idle: number;
+  commits: number;
+  rollbacks: number;
+  tuples_read: number;
+  tuples_fetched: number;
+  tuples_inserted: number;
+  tuples_updated: number;
+  tuples_deleted: number;
+  block_hits: number;
+  block_reads: number;
+  deadlocks: number;
+  db_size: number;
+  temp_files: number;
+  temp_bytes: number;
+}
+
+export interface MetricsHistory {
+  snapshots: MetricSnapshot[];
+  max_points: number;
+  interval_seconds: number;
+}
+
 export interface TableColumn {
   name: string;
   data_type: string;
