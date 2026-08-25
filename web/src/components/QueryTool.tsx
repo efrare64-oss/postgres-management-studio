@@ -515,6 +515,9 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
+  const editorHandlersRef = useRef({ run, formatSql, openGotoLine, toggleCommentSelection, uppercaseSelection, lowercaseSelection });
+  editorHandlersRef.current = { run, formatSql, openGotoLine, toggleCommentSelection, uppercaseSelection, lowercaseSelection };
+
   const extensions = useMemo(() => [
     sql({ dialect: PostgreSQL, schema, defaultSchema, upperCaseKeywords: true }),
     autocompletion(),
@@ -526,25 +529,25 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     ssmsTheme,
     keymap.of([{
       key: 'F5',
-      run: () => { run('execute'); return true; },
+      run: () => { editorHandlersRef.current.run('execute'); return true; },
     }, {
       key: 'Mod-Enter',
-      run: () => { run('execute'); return true; },
+      run: () => { editorHandlersRef.current.run('execute'); return true; },
     }, {
       key: 'Mod-Shift-f',
-      run: () => { formatSql(); return true; },
+      run: () => { editorHandlersRef.current.formatSql(); return true; },
     }, {
       key: 'Mod-/',
-      run: () => { toggleCommentSelection(); return true; },
+      run: () => { editorHandlersRef.current.toggleCommentSelection(); return true; },
     }, {
       key: 'Mod-Shift-U',
-      run: () => { uppercaseSelection(); return true; },
+      run: () => { editorHandlersRef.current.uppercaseSelection(); return true; },
     }, {
       key: 'Mod-Shift-L',
-      run: () => { lowercaseSelection(); return true; },
+      run: () => { editorHandlersRef.current.lowercaseSelection(); return true; },
     }, {
       key: 'Mod-Shift-g',
-      run: () => { openGotoLine(); return true; },
+      run: () => { editorHandlersRef.current.openGotoLine(); return true; },
     }, {
       key: 'Tab',
       run: (view) => {
@@ -560,7 +563,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
         return indentMore(view);
       },
     }]),
-  ], [schema, defaultSchema, run, formatSql]);
+  ], [schema, defaultSchema]);
 
   useImperativeHandle(ref, () => ({
     run,
