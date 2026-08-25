@@ -192,11 +192,11 @@ func (s *Service) ListCatalogObjects(ctx context.Context, serverID int64, databa
 	return out, err
 }
 
-func (s *Service) GetObjectSQL(ctx context.Context, serverID int64, database, schema, name, kind string) (string, error) {
+func (s *Service) GetObjectSQL(ctx context.Context, serverID int64, database, schema, name, kind, table string) (string, error) {
 	var out string
 	err := s.withDatabase(ctx, serverID, database, func(q connection.Querier) error {
 		var err error
-		out, err = s.repo.GetObjectSQL(ctx, q, schema, name, kind)
+		out, err = s.repo.GetObjectSQL(ctx, q, schema, name, kind, table)
 		return err
 	})
 	return out, err

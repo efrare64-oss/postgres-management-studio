@@ -601,7 +601,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
   const totalRows = results.reduce((n, r) => n + r.rows.length, 0);
 
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="flex h-full w-full min-h-0 flex-col overflow-hidden">
       <input
         ref={fileInputRef}
         type="file"
@@ -640,7 +640,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
       </div>
 
       {showResults && (
-        <div className="min-h-[120px] flex-1 overflow-auto bg-panel-bg">
+        <div className="min-h-0 flex-1 overflow-auto bg-panel-bg">
           {tab === 'results' && (
             results.length > 0 ? (
               <div className="flex flex-col gap-1.5 p-1.5">

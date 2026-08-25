@@ -89,7 +89,7 @@ func (h *ClusterHandler) objectSQL(c *gin.Context) {
 	if !ok {
 		return
 	}
-	out, err := h.service.GetObjectSQL(c.Request.Context(), id, c.Param("database"), c.Param("schema"), c.Param("name"), c.Param("kind"))
+	out, err := h.service.GetObjectSQL(c.Request.Context(), id, c.Param("database"), c.Param("schema"), c.Param("name"), c.Param("kind"), c.Query("table"))
 	if err != nil {
 		respondError(c, err)
 		return

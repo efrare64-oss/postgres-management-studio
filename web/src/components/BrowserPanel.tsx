@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { Fa } from '../icons';
 import ContextMenu, { type ContextItem, type ContextMenuState } from './ContextMenu';
@@ -204,18 +204,24 @@ export default function BrowserPanel({ servers, groups, selectedKey, refreshKey 
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [cache, setCache] = useState<Record<string, BuiltNode[]>>({});
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const nodesRef = useRef<Record<string, BuiltNode>>({});
+  const serversRef = useRef(servers);
+  const groupsRef = useRef(groups);
+  serversRef.current = servers;
+  groupsRef.current = groups;
 
   useEffect(() => { setCache({}); setOpen({}); }, [refreshKey]);
 
-  const setChildren = useCallback((key: string, children: BuiltNode[]) =>
-    setCache((c) => ({ ...c, [key]: children })), []);
+  const setChildren = useCallback((key: string, children: BuiltNode[]) => {
+    for (const ch of children) nodesRef.current[ch.key] = ch;
+    setCache((c) => ({ ...c, [key]: children }));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    fetchChildren(
-      { key: 'root', type: 'root', label: 'Servers', icon: 'falcon', loadable: true },
-      servers, groups, setChildren,
-    )
+    const rootNode: BuiltNode = { key: 'root', type: 'root', label: 'Servers', icon: 'falcon', loadable: true };
+    nodesRef.current[rootNode.key] = rootNode;
+    fetchChildren(rootNode, servers, groups, setChildren)
       .then((built) => {
         if (cancelled) return;
         setChildren('root', built);
@@ -227,6 +233,37 @@ export default function BrowserPanel({ servers, groups, selectedKey, refreshKey 
 
   const isOpen = (key: string) => !!open[key];
   const childrenOf = (key: string) => cache[key] || [];
+
+  const refreshNode = useCallback(async (key: string) => {
+    setCache((c) => {
+      const next: Record<string, BuiltNode[]> = {};
+      for (const k of Object.keys(c)) if (k !== key && !k.startsWith(key + ':')) next[k] = c[k];
+      return next;
+    });
+    setOpen((o) => {
+      const next: Record<string, boolean> = { ...o };
+      for (const k of Object.keys(next)) if (k !== key && k.startsWith(key + ':')) next[k] = false;
+      return next;
+    });
+    const target = nodesRef.current[key];
+    if (!target) return;
+    try {
+      const built = await fetchChildren(target, serversRef.current, groupsRef.current, setChildren);
+      setChildren(key, built);
+      setOpen((o) => ({ ...o, [key]: true }));
+    } catch (err) {
+      console.error(err);
+    }
+  }, [setChildren]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const key = (e as CustomEvent<{ nodeKey?: string }>).detail?.nodeKey;
+      if (key) void refreshNode(key);
+    };
+    window.addEventListener('pgms:refresh-node', handler);
+    return () => window.removeEventListener('pgms:refresh-node', handler);
+  }, [refreshNode]);
 
   const load = useCallback(async (node: BuiltNode) => {
     const built = await fetchChildren(node, servers, groups, setChildren);
@@ -434,18 +471,22 @@ function baseContextItems(node: BuiltNode, onAction: (a: ContextAction) => void)
     case 'view':
       return [
         { label: 'View/Edit Data', icon: 'table', onClick: () => onAction({ kind: 'view-data', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
+        { label: 'Edit View...', icon: 'edit', onClick: () => onAction({ kind: 'edit-view', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Drop View...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-view', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
       ];
     case 'sequence':
       return [
+        { label: 'Edit Sequence...', icon: 'edit', onClick: () => onAction({ kind: 'edit-sequence', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Drop Sequence...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-sequence', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
       ];
     case 'function':
       return [
+        { label: 'Edit Function...', icon: 'edit', onClick: () => onAction({ kind: 'edit-function', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Drop Function...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-function', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
       ];
     case 'procedure':
       return [
+        { label: 'Edit Procedure...', icon: 'edit', onClick: () => onAction({ kind: 'edit-procedure', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
         { label: 'Drop Procedure...', icon: 'close', danger: true, onClick: () => onAction({ kind: 'drop-procedure', serverId: node.serverId, database: node.database ?? undefined, schema: node.schema ?? undefined, name: node.name }) },
       ];
     case 'role':
@@ -609,7 +650,7 @@ function TreeNode({ node, depth, isOpen, toggle, childrenOf, selectedKey, onSele
       x: e.clientX,
       y: e.clientY,
       node,
-      items: buildContextItems(node, onAction),
+      items: buildContextItems(node, (a) => onAction({ ...a, nodeKey: node.key })),
     });
   };
 

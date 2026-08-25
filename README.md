@@ -26,9 +26,15 @@ Versão 0.3.0 • Stack: Go, React + TypeScript + Vite
 - 📊 **Visualização de tabelas, views e funções com seleção e cópia** / Browse tables, views and functions with row selection and copy
 - ⚡ **Query Tool com autocomplete, EXPLAIN, múltiplos resultados, exportação CSV e gerenciamento de arquivos** / Query Tool with autocomplete, EXPLAIN, multiple result grids, CSV export and file management
   - Atalhos / Shortcuts: F5 (executar), Ctrl+S (salvar), Ctrl+Shift+S (salvar como), Ctrl+N (novo), Ctrl+O (abrir)
+- 📝 **Criação e edição de objetos estilo SSMS via Query Tool** / SSMS-style object creation & editing via Query Tool
+  - Procedures, functions e trigger functions abrem uma aba com template `CREATE OR REPLACE` já conectada ao banco do objeto / open a tab pre-filled with a `CREATE OR REPLACE` template connected to the object's database
+  - Views, matviews e sequences com templates prontos / ready-to-use templates for views, matviews and sequences
+  - Indexes, columns, constraints, triggers, policies e rules com templates por tabela / per-table templates for indexes, columns, constraints, triggers, policies and rules
+  - **Edit** em cada objeto abre o DDL real (`ALTER`/`CREATE OR REPLACE`) gerado do catálogo para editar e reexecutar / **Edit** opens the real catalog-generated DDL (`ALTER`/`CREATE OR REPLACE`) ready to tweak and re-execute
+- 🖱️ **Menus de contexto completos com submenus** / Full context menus with submenus
+- 🌳 **Refresh por objeto sem colapsar a árvore** / Per-object refresh that preserves tree expansion
 - 🛡️ **Conexões seguras com gerenciamento de credenciais** / Secure connections with credential management
 - 📁 **Gerenciamento de arquivos SQL** / SQL file management (New/Open/Save/Save As)
-- 🖱️ **Menus de contexto completos com submenus** / Full context menus with submenus
 - 🌐 **Aplicação desktop nativa (WebView2) + servidor REST** / Native desktop app (WebView2) + REST server
 
 ## 🛠️ Stack Tecnológica / Tech Stack
@@ -154,6 +160,8 @@ postgres-management-studio/
 - **Explorador de Banco / Database Explorer** — Navegue por bancos, schemas e tabelas com menus de contexto / browse databases, schemas and tables with context menus
 - **Query Tool** — Execute SQL com autocomplete, EXPLAIN/EXPLAIN ANALYZE, múltiplos resultados, exportação CSV e gerenciamento de arquivos (Novo/Abrir/Salvar) / run SQL with autocomplete, EXPLAIN/EXPLAIN ANALYZE, multiple result grids, CSV export and file management (New/Open/Save)
   - Atalhos / Shortcuts: F5 (executar), Ctrl+S (salvar), Ctrl+Shift+S (salvar como), Ctrl+N (novo), Ctrl+O (abrir)
+- **Criar/Editar Objetos / Create/Edit Objects** — Clique com o botão direito em um schema, tabela ou objeto e use "New ..." ou "Edit ...": uma aba do Query Tool abre com o script pronto (template de criação ou DDL real do catálogo), já conectada ao banco correto. Execute com F5 para aplicar. / Right-click a schema, table or object and use "New ..." or "Edit ...": a Query Tool tab opens pre-filled (creation template or the object's real catalog DDL) connected to the right database. Hit F5 to apply.
+- **Scripts por Objeto / Per-Object Scripts** — Menu "Scripts ▸ Create Script" gera o DDL de qualquer objeto / the "Scripts ▸ Create Script" menu generates the DDL of any object
 - **Visualização de Tabelas / Table View** — Veja propriedades, colunas, índices e estatísticas com seleção de linhas e cópia / view properties, columns, indexes and statistics with row selection and copy
 - **Dashboards** — Servidor e banco com sessões ativas e tamanhos / server and database dashboards with active sessions and sizes
 
@@ -186,6 +194,9 @@ Contributions are very welcome! Please follow these steps:
 - ✅ Monitoramento de performance / Performance monitoring
 - ✅ Temas dark/light / Dark/light themes
 - ✅ Suporte a múltiplas conexões simultâneas / Support for multiple simultaneous connections
+- ✅ Criação/edição de objetos via Query Tool no estilo SSMS (procedures, functions, views, sequences, indexes, columns, constraints, triggers, policies, rules) / SSMS-style object creation & editing via Query Tool
+- ✅ DDL gerado do catálogo para edição e "Create Script" de cada objeto / Catalog-generated DDL for editing and per-object "Create Script"
+- ✅ Refresh por objeto preservando a expansão da árvore / Per-object refresh preserving tree expansion
 
 ## ⚠️ Problemas Conhecidos / Known Issues
 

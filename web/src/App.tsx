@@ -18,16 +18,6 @@ import TableEditDialog from './components/Dialogs/TableEditDialog';
 import RoleDialog from './components/Dialogs/RoleDialog';
 import DatabaseDialog from './components/Dialogs/DatabaseDialog';
 import SchemaDialog from './components/Dialogs/SchemaDialog';
-import ViewDialog from './components/Dialogs/ViewDialog';
-import SequenceDialog from './components/Dialogs/SequenceDialog';
-import FunctionDialog from './components/Dialogs/FunctionDialog';
-import ProcedureDialog from './components/Dialogs/ProcedureDialog';
-import IndexDialog from './components/Dialogs/IndexDialog';
-import ColumnDialog from './components/Dialogs/ColumnDialog';
-import ConstraintDialog from './components/Dialogs/ConstraintDialog';
-import TriggerDialog from './components/Dialogs/TriggerDialog';
-import PolicyDialog from './components/Dialogs/PolicyDialog';
-import RuleDialog from './components/Dialogs/RuleDialog';
 import PartitionDialog from './components/Dialogs/PartitionDialog';
 import TruncateDialog from './components/Dialogs/TruncateDialog';
 import ExtensionDialog from './components/Dialogs/ExtensionDialog';
@@ -38,9 +28,44 @@ import BackupDialog from './components/Dialogs/BackupDialog';
 import RestoreDialog from './components/Dialogs/RestoreDialog';
 import SearchPanel from './components/SearchPanel';
 import type { AppTab, ContextAction, MenuDef, MenuId, ModalState, QueryContext, ServerGroup, StudioServer, ToolbarItem, TreeNode } from './types';
+import {
+  columnTemplate, constraintTemplate, functionTemplate, indexTemplate,
+  policyTemplate, procedureTemplate, ruleTemplate, sequenceTemplate,
+  triggerTemplate, viewTemplate,
+} from './sqlTemplates';
 import { Fa } from './icons';
 
 let tabSeq = 1;
+
+const requestNodeRefresh = (nodeKey?: string) => {
+  if (nodeKey) window.dispatchEvent(new CustomEvent('pgms:refresh-node', { detail: { nodeKey } }));
+};
+
+const parentKeyOf = (key?: string): string | undefined => {
+  if (!key) return undefined;
+  const seg = key.split(':');
+  if (seg[0] === 'db' && seg.length === 3) return `server:${seg[1]}:databases`;
+  if (seg[0] === 'server' && seg.length === 3) return seg[1] === '0' ? 'root' : `group:${seg[1]}`;
+  return seg.slice(0, -1).join(':') || 'root';
+};
+
+const CREATE_FOLDER: Record<string, string> = {
+  'create-table': 'tables',
+  'create-view': 'views',
+  'create-matview': 'matviews',
+  'create-sequence': 'sequences',
+  'create-function': 'functions',
+  'create-trigger-function': 'functions',
+  'create-procedure': 'procedures',
+};
+
+const containerKeyOf = (a: ContextAction | null): string | undefined => {
+  const key = a?.nodeKey;
+  if (!key) return undefined;
+  const folder = a?.kind ? CREATE_FOLDER[a.kind] : undefined;
+  if (folder && a?.nodeType === 'schema') return `${key}:${folder}`;
+  return key;
+};
 
 const OPENABLE = [
   'table', 'view', 'matview', 'sequence', 'function', 'procedure', 'role', 'column', 'index', 'constraint', 'trigger',
@@ -67,6 +92,7 @@ export default function App() {
   const [dbLoading, setDbLoading] = useState(false);
   const [queryRunning, setQueryRunning] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const lastActionRef = useRef<ContextAction | null>(null);
   const queryRefs = useRef<Record<string, QueryToolHandle>>({});
   const dbCacheRef = useRef<Record<string, { name: string; size: string }[]>>({});
   const dbInflightRef = useRef<Record<string, Promise<{ name: string; size: string }[]>>>({});
@@ -259,11 +285,20 @@ export default function App() {
     return s ? s.name : '';
   };
 
+  const refreshSelfFromLastAction = () => {
+    const k = lastActionRef.current?.nodeKey;
+    if (k) requestNodeRefresh(k);
+    else setRefreshKey((x) => x + 1);
+  };
+
   const handleAction = useCallback((action: ContextAction) => {
     const { serverId, database, schema, name, nodeType, table } = action;
+    lastActionRef.current = action;
+    const parentKey = parentKeyOf(action.nodeKey);
     const refresh = () => {
       loadData();
-      setRefreshKey((k) => k + 1);
+      if (parentKey) requestNodeRefresh(parentKey);
+      else setRefreshKey((k) => k + 1);
     };
     switch (action.kind) {
       case 'edit-server':
@@ -426,35 +461,171 @@ export default function App() {
           api.refreshMatView(serverId, database, schema, name, true).then(() => setStatus(`Matview ${name} atualizada`)).catch((e) => setStatus(e.message));
         }
         break;
-      case 'create-view':
-        if (serverId != null && database && schema) setModal({ type: 'view', serverId, database, schema, kind: 'view' });
+      case 'create-view': {
+        if (serverId == null || !database) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New View',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: viewTemplate(schema || 'public'),
+        });
         break;
-      case 'create-matview':
-        if (serverId != null && database && schema) setModal({ type: 'view', serverId, database, schema, kind: 'matview' });
+      }
+      case 'create-matview': {
+        if (serverId == null || !database) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Materialized View',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: viewTemplate(schema || 'public', true),
+        });
         break;
-      case 'create-sequence':
-        if (serverId != null && database && schema) setModal({ type: 'sequence', serverId, database, schema });
+      }
+      case 'edit-view':
+        if (serverId != null && database && name) {
+          api.objectSql(serverId, database, schema || 'public', 'view', name)
+            .then((r) => openTab({
+              id: `query:${tabSeq++}`,
+              title: `ALTER ${name}`,
+              kind: 'query',
+              context: { serverId, database },
+              initialQuery: r.sql,
+            }))
+            .catch((e) => setStatus(e.message));
+        }
         break;
-      case 'create-function':
-        if (serverId != null && database && schema) setModal({ type: 'function', serverId, database, schema });
+      case 'create-sequence': {
+        if (serverId == null || !database) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Sequence',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: sequenceTemplate(schema || 'public'),
+        });
         break;
-      case 'create-procedure':
-        if (serverId != null && database && schema) setModal({ type: 'procedure', serverId, database, schema });
+      }
+      case 'edit-sequence':
+        if (serverId != null && database && name) {
+          api.objectSql(serverId, database, schema || 'public', 'sequence', name)
+            .then((r) => openTab({
+              id: `query:${tabSeq++}`,
+              title: `ALTER ${name}`,
+              kind: 'query',
+              context: { serverId, database },
+              initialQuery: r.sql.replace(/^CREATE SEQUENCE/, 'ALTER SEQUENCE'),
+            }))
+            .catch((e) => setStatus(e.message));
+        }
         break;
-      case 'create-trigger-function':
-        if (serverId != null && database && schema) setModal({ type: 'function', serverId, database, schema, initialReturnType: 'trigger', title: 'Nova Trigger Function' });
+      case 'create-function': {
+        if (serverId == null || !database) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Function',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: functionTemplate(schema || 'public'),
+        });
         break;
-      case 'create-index':
-        if (serverId != null && database && schema && name) setModal({ type: 'index', serverId, database, schema, table: name });
+      }
+      case 'create-procedure': {
+        if (serverId == null || !database) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Procedure',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: procedureTemplate(schema || 'public'),
+        });
         break;
+      }
+      case 'edit-procedure':
+        if (serverId != null && database && name) {
+          api.objectSql(serverId, database, schema || 'public', 'procedure', name)
+            .then((r) => openTab({
+              id: `query:${tabSeq++}`,
+              title: `ALTER ${name}`,
+              kind: 'query',
+              context: { serverId, database },
+              initialQuery: r.sql,
+            }))
+            .catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'create-trigger-function': {
+        if (serverId == null || !database) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Trigger Function',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: functionTemplate(schema || 'public', 'trigger'),
+        });
+        break;
+      }
+      case 'edit-function':
+        if (serverId != null && database && name) {
+          api.objectSql(serverId, database, schema || 'public', 'function', name)
+            .then((r) => openTab({
+              id: `query:${tabSeq++}`,
+              title: `ALTER ${name}`,
+              kind: 'query',
+              context: { serverId, database },
+              initialQuery: r.sql,
+            }))
+            .catch((e) => setStatus(e.message));
+        }
+        break;
+      case 'create-index': {
+        if (serverId == null || !database || !name) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Index',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: indexTemplate(schema || 'public', name),
+        });
+        break;
+      }
       case 'edit-index':
-        if (serverId != null && database && schema && name && table) setModal({ type: 'index-edit', serverId, database, schema, table, index: name });
+        if (serverId != null && database && name) {
+          api.objectSql(serverId, database, schema || 'public', 'index', name, table)
+            .then((r) => openTab({
+              id: `query:${tabSeq++}`,
+              title: `ALTER ${name}`,
+              kind: 'query',
+              context: { serverId, database },
+              initialQuery: r.sql,
+            }))
+            .catch((e) => setStatus(e.message));
+        }
         break;
-      case 'create-column':
-        if (serverId != null && database && schema && table) setModal({ type: 'column', serverId, database, schema, table });
+      case 'create-column': {
+        if (serverId == null || !database || !table) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Column',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: columnTemplate(schema || 'public', table),
+        });
         break;
+      }
       case 'edit-column':
-        if (serverId != null && database && schema && name && table) setModal({ type: 'column', serverId, database, schema, table, column: name });
+        if (serverId != null && database && name && table) {
+          api.objectSql(serverId, database, schema || 'public', 'column', name, table)
+            .then((r) => openTab({
+              id: `query:${tabSeq++}`,
+              title: `ALTER ${name}`,
+              kind: 'query',
+              context: { serverId, database },
+              initialQuery: r.sql,
+            }))
+            .catch((e) => setStatus(e.message));
+        }
         break;
       case 'drop-column':
         if (serverId != null && database && schema && name && table) {
@@ -466,11 +637,29 @@ export default function App() {
           });
         }
         break;
-      case 'create-constraint':
-        if (serverId != null && database && schema && table) setModal({ type: 'constraint', serverId, database, schema, table });
+      case 'create-constraint': {
+        if (serverId == null || !database || !table) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Constraint',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: constraintTemplate(schema || 'public', table),
+        });
         break;
+      }
       case 'edit-constraint':
-        if (serverId != null && database && schema && name && table) setModal({ type: 'constraint', serverId, database, schema, table, constraint: name });
+        if (serverId != null && database && name && table) {
+          api.objectSql(serverId, database, schema || 'public', 'constraint', name, table)
+            .then((r) => openTab({
+              id: `query:${tabSeq++}`,
+              title: `ALTER ${name}`,
+              kind: 'query',
+              context: { serverId, database },
+              initialQuery: r.sql,
+            }))
+            .catch((e) => setStatus(e.message));
+        }
         break;
       case 'drop-constraint':
         if (serverId != null && database && schema && name && table) {
@@ -482,11 +671,29 @@ export default function App() {
           });
         }
         break;
-      case 'create-trigger':
-        if (serverId != null && database && schema && table) setModal({ type: 'trigger', serverId, database, schema, table });
+      case 'create-trigger': {
+        if (serverId == null || !database || !table) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Trigger',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: triggerTemplate(schema || 'public', table),
+        });
         break;
+      }
       case 'edit-trigger':
-        if (serverId != null && database && schema && name && table) setModal({ type: 'trigger', serverId, database, schema, table, trigger: name });
+        if (serverId != null && database && name && table) {
+          api.objectSql(serverId, database, schema || 'public', 'trigger', name, table)
+            .then((r) => openTab({
+              id: `query:${tabSeq++}`,
+              title: `ALTER ${name}`,
+              kind: 'query',
+              context: { serverId, database },
+              initialQuery: r.sql,
+            }))
+            .catch((e) => setStatus(e.message));
+        }
         break;
       case 'drop-trigger':
         if (serverId != null && database && schema && name && table) {
@@ -508,11 +715,29 @@ export default function App() {
           api.disableTrigger(serverId, database, schema, table, name).then(() => setStatus(`Trigger ${name} desabilitado`)).catch((e) => setStatus(e.message));
         }
         break;
-      case 'create-policy':
-        if (serverId != null && database && schema && table) setModal({ type: 'policy', serverId, database, schema, table });
+      case 'create-policy': {
+        if (serverId == null || !database || !table) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Policy',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: policyTemplate(schema || 'public', table),
+        });
         break;
+      }
       case 'edit-policy':
-        if (serverId != null && database && schema && name && table) setModal({ type: 'policy', serverId, database, schema, table, policy: name });
+        if (serverId != null && database && name && table) {
+          api.objectSql(serverId, database, schema || 'public', 'policy', name, table)
+            .then((r) => openTab({
+              id: `query:${tabSeq++}`,
+              title: `ALTER ${name}`,
+              kind: 'query',
+              context: { serverId, database },
+              initialQuery: r.sql,
+            }))
+            .catch((e) => setStatus(e.message));
+        }
         break;
       case 'drop-policy':
         if (serverId != null && database && schema && name && table) {
@@ -524,11 +749,29 @@ export default function App() {
           });
         }
         break;
-      case 'create-rule':
-        if (serverId != null && database && schema && table) setModal({ type: 'rule', serverId, database, schema, table });
+      case 'create-rule': {
+        if (serverId == null || !database || !table) break;
+        openTab({
+          id: `query:${tabSeq++}`,
+          title: 'New Rule',
+          kind: 'query',
+          context: { serverId, database },
+          initialQuery: ruleTemplate(schema || 'public', table),
+        });
         break;
+      }
       case 'edit-rule':
-        if (serverId != null && database && schema && name && table) setModal({ type: 'rule', serverId, database, schema, table, rule: name });
+        if (serverId != null && database && name && table) {
+          api.objectSql(serverId, database, schema || 'public', 'rule', name, table)
+            .then((r) => openTab({
+              id: `query:${tabSeq++}`,
+              title: `ALTER ${name}`,
+              kind: 'query',
+              context: { serverId, database },
+              initialQuery: r.sql,
+            }))
+            .catch((e) => setStatus(e.message));
+        }
         break;
       case 'drop-rule':
         if (serverId != null && database && schema && name && table) {
@@ -651,7 +894,9 @@ export default function App() {
         }
         break;
       case 'refresh':
-        refresh();
+        loadData();
+        if (action.nodeKey) requestNodeRefresh(action.nodeKey);
+        else setRefreshKey((k) => k + 1);
         break;
       default:
         break;
@@ -788,7 +1033,7 @@ export default function App() {
           title="Arraste para redimensionar"
         />
 
-        <section className="flex min-w-0 flex-1 flex-col bg-pg-bg">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-pg-bg">
           <input
             ref={importInputRef}
             type="file"
@@ -870,10 +1115,10 @@ export default function App() {
         <GroupDialog group={modal.group} onSaved={loadData} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'table' && (
-        <CreateTableDialog serverId={context.serverId} database={context.database} schema={context.schema} onSaved={loadData} onClose={() => setModal(null)} />
+        <CreateTableDialog serverId={context.serverId} database={context.database} schema={context.schema} onSaved={() => { loadData(); const k = containerKeyOf(lastActionRef.current); if (k) requestNodeRefresh(k); }} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'table-edit' && (
-        <TableEditDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+        <TableEditDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={refreshSelfFromLastAction} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'role' && (
         <RoleDialog serverId={context.serverId} role={modal.role} onSaved={loadData} onClose={() => setModal(null)} />
@@ -882,55 +1127,22 @@ export default function App() {
         <AboutDialog onClose={() => setModal(null)} />
       )}
       {modal?.type === 'database' && (
-        <DatabaseDialog serverId={modal.serverId} onSaved={() => { loadData(); setRefreshKey((k) => k + 1); }} onClose={() => setModal(null)} />
+        <DatabaseDialog serverId={modal.serverId} onSaved={() => { loadData(); requestNodeRefresh(`server:${modal.serverId}:databases`); }} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'schema' && (
-        <SchemaDialog serverId={modal.serverId} database={modal.database} onSaved={() => { loadData(); setRefreshKey((k) => k + 1); }} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'view' && (
-        <ViewDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} kind={modal.kind} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'sequence' && (
-        <SequenceDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'function' && (
-        <FunctionDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} initialReturnType={modal.initialReturnType} title={modal.title} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'procedure' && (
-        <ProcedureDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'index' && (
-        <IndexDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'index-edit' && (
-        <IndexDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} index={modal.index} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'column' && (
-        <ColumnDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} column={modal.column} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'constraint' && (
-        <ConstraintDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} constraint={modal.constraint} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'trigger' && (
-        <TriggerDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} trigger={modal.trigger} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'policy' && (
-        <PolicyDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} policy={modal.policy} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === 'rule' && (
-        <RuleDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} rule={modal.rule} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+        <SchemaDialog serverId={modal.serverId} database={modal.database} onSaved={() => { loadData(); requestNodeRefresh(`db:${modal.serverId}:${modal.database}:schemas`); }} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'partition-add' && (
-        <PartitionDialog mode="add" serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+        <PartitionDialog mode="add" serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={refreshSelfFromLastAction} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'partition-attach' && (
-        <PartitionDialog mode="attach" serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+        <PartitionDialog mode="attach" serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={refreshSelfFromLastAction} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'truncate' && (
-        <TruncateDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+        <TruncateDialog serverId={modal.serverId} database={modal.database} schema={modal.schema} table={modal.table} onSaved={refreshSelfFromLastAction} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'extension' && (
-        <ExtensionDialog serverId={modal.serverId} database={modal.database} onSaved={() => setRefreshKey((k) => k + 1)} onClose={() => setModal(null)} />
+        <ExtensionDialog serverId={modal.serverId} database={modal.database} onSaved={refreshSelfFromLastAction} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'grants' && (
         <GrantDialog serverId={modal.serverId} database={modal.database} objectKind={modal.objectKind} objectName={modal.objectName} schema={modal.schema} onSaved={() => { setStatus('Privilégios aplicados'); }} onClose={() => setModal(null)} />

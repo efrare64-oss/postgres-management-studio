@@ -25,17 +25,6 @@ export type ModalState =
   | { type: 'role'; role?: Role | null }
   | { type: 'database'; serverId: number }
   | { type: 'schema'; serverId: number; database: string }
-  | { type: 'view'; serverId: number; database: string; schema: string; kind: 'view' | 'matview' }
-  | { type: 'sequence'; serverId: number; database: string; schema: string }
-  | { type: 'function'; serverId: number; database: string; schema: string; initialReturnType?: string; title?: string }
-  | { type: 'procedure'; serverId: number; database: string; schema: string }
-  | { type: 'index'; serverId: number; database: string; schema: string; table: string }
-  | { type: 'index-edit'; serverId: number; database: string; schema: string; table: string; index: string }
-  | { type: 'column'; serverId: number; database: string; schema: string; table: string; column?: string | null }
-  | { type: 'constraint'; serverId: number; database: string; schema: string; table: string; constraint?: string | null }
-  | { type: 'trigger'; serverId: number; database: string; schema: string; table: string; trigger?: string | null }
-  | { type: 'policy'; serverId: number; database: string; schema: string; table: string; policy?: string | null }
-  | { type: 'rule'; serverId: number; database: string; schema: string; table: string; rule?: string | null }
   | { type: 'partition-add'; serverId: number; database: string; schema: string; table: string }
   | { type: 'partition-attach'; serverId: number; database: string; schema: string; table: string }
   | { type: 'truncate'; serverId: number; database: string; schema: string; table: string }
@@ -58,6 +47,7 @@ export interface ContextAction {
   name?: string;
   table?: string;
   nodeType?: string;
+  nodeKey?: string;
 }
 
 export interface MenuItem {

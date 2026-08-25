@@ -11,7 +11,7 @@ import (
 	"postgres-management-studio/internal/domain/connection"
 )
 
-func (r *ClusterRepository) GetObjectSQL(ctx context.Context, q connection.Querier, schema, name, kind string) (string, error) {
+func (r *ClusterRepository) GetObjectSQL(ctx context.Context, q connection.Querier, schema, name, kind, table string) (string, error) {
 	switch kind {
 	case "table":
 		return r.tableDDL(ctx, q, schema, name)
@@ -25,6 +25,18 @@ func (r *ClusterRepository) GetObjectSQL(ctx context.Context, q connection.Queri
 		return r.functionDef(ctx, q, schema, name)
 	case "procedure":
 		return r.functionDef(ctx, q, schema, name)
+	case "index":
+		return r.indexDef(ctx, q, schema, name)
+	case "constraint":
+		return r.constraintDef(ctx, q, schema, name)
+	case "trigger":
+		return r.triggerDef(ctx, q, schema, name)
+	case "policy":
+		return r.policyDef(ctx, q, schema, name)
+	case "rule":
+		return r.ruleDef(ctx, q, schema, name)
+	case "column":
+		return r.columnDef(ctx, q, schema, table, name)
 	case "schema":
 		return r.schemaDef(ctx, q, name)
 	case "type":
@@ -320,4 +332,127 @@ func (r *ClusterRepository) functionDef(ctx context.Context, q connection.Querie
 		return "", fmt.Errorf("load routine definition: %w", err)
 	}
 	return def, nil
+}
+
+func (r *ClusterRepository) indexDef(ctx context.Context, q connection.Querier, schema, name string) (string, error) {
+	var def string
+	err := q.QueryRow(ctx, `
+		SELECT pg_get_indexdef(i.indexrelid)
+		FROM pg_index i
+		JOIN pg_class ic ON ic.oid = i.indexrelid
+		JOIN pg_namespace n ON n.oid = ic.relnamespace
+		WHERE n.nspname = $1 AND ic.relname = $2`, schema, name,
+	).Scan(&def)
+	if err != nil {
+		return "", fmt.Errorf("load index definition: %w", err)
+	}
+	return def + ";", nil
+}
+
+func (r *ClusterRepository) constraintDef(ctx context.Context, q connection.Querier, schema, name string) (string, error) {
+	var tableName, def string
+	err := q.QueryRow(ctx, `
+		SELECT ct.relname, pg_get_constraintdef(cn.oid)
+		FROM pg_constraint cn
+		JOIN pg_class ct ON ct.oid = cn.conrelid
+		JOIN pg_namespace n ON n.oid = ct.relnamespace
+		WHERE n.nspname = $1 AND cn.conname = $2`, schema, name,
+	).Scan(&tableName, &def)
+	if err != nil {
+		return "", fmt.Errorf("load constraint definition: %w", err)
+	}
+	return "ALTER TABLE " + qualifiedName(schema, tableName) + "\n    ADD CONSTRAINT " + quoteIdent(name) + " " + def + ";", nil
+}
+
+func (r *ClusterRepository) triggerDef(ctx context.Context, q connection.Querier, schema, name string) (string, error) {
+	var def string
+	err := q.QueryRow(ctx, `
+		SELECT pg_get_triggerdef(t.oid)
+		FROM pg_trigger t
+		JOIN pg_class c ON c.oid = t.tgrelid
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE n.nspname = $1 AND t.tgname = $2 AND NOT t.tgisinternal`, schema, name,
+	).Scan(&def)
+	if err != nil {
+		return "", fmt.Errorf("load trigger definition: %w", err)
+	}
+	return def + ";", nil
+}
+
+func (r *ClusterRepository) policyDef(ctx context.Context, q connection.Querier, schema, name string) (string, error) {
+	var tablename, permissive, roles, cmd, qual, withCheck string
+	err := q.QueryRow(ctx, `
+		SELECT tablename, permissive, roles, cmd, COALESCE(qual, ''), COALESCE(with_check, '')
+		FROM pg_policies
+		WHERE schemaname = $1 AND policyname = $2`, schema, name,
+	).Scan(&tablename, &permissive, &roles, &cmd, &qual, &withCheck)
+	if err != nil {
+		return "", fmt.Errorf("load policy definition: %w", err)
+	}
+
+	var b strings.Builder
+	b.WriteString("CREATE POLICY " + quoteIdent(name) + " ON " + qualifiedName(schema, tablename) + "\n")
+	b.WriteString("    AS " + permissive + "\n")
+	b.WriteString("    FOR " + cmd + "\n")
+	b.WriteString("    TO " + roles + "\n")
+	if qual != "" {
+		b.WriteString("    USING (" + qual + ")\n")
+	}
+	if withCheck != "" {
+		b.WriteString("    WITH CHECK (" + withCheck + ")\n")
+	}
+	return strings.TrimSuffix(b.String(), "\n") + ";", nil
+}
+
+func (r *ClusterRepository) ruleDef(ctx context.Context, q connection.Querier, schema, name string) (string, error) {
+	var def string
+	err := q.QueryRow(ctx, `
+		SELECT definition
+		FROM pg_rules
+		WHERE schemaname = $1 AND rulename = $2`, schema, name,
+	).Scan(&def)
+	if err != nil {
+		return "", fmt.Errorf("load rule definition: %w", err)
+	}
+	def = strings.TrimSpace(def)
+	if !strings.HasSuffix(def, ";") {
+		def += ";"
+	}
+	return def, nil
+}
+
+func (r *ClusterRepository) columnDef(ctx context.Context, q connection.Querier, schema, table, name string) (string, error) {
+	var typ string
+	var notNull bool
+	var def *string
+	err := q.QueryRow(ctx, `
+		SELECT format_type(a.atttypid, a.atttypmod), a.attnotnull, pg_get_expr(ad.adbin, ad.adrelid)
+		FROM pg_attribute a
+		JOIN pg_class c ON c.oid = a.attrelid
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
+		WHERE n.nspname = $1 AND c.relname = $2 AND a.attname = $3 AND a.attnum > 0 AND NOT a.attisdropped`,
+		schema, table, name,
+	).Scan(&typ, &notNull, &def)
+	if err != nil {
+		return "", fmt.Errorf("load column definition: %w", err)
+	}
+	if table == "" {
+		return "", fmt.Errorf("table is required for column script")
+	}
+
+	var b strings.Builder
+	b.WriteString("ALTER TABLE " + qualifiedName(schema, table) + "\n")
+	b.WriteString("    ALTER COLUMN " + quoteIdent(name) + " TYPE " + typ + ";\n")
+	if notNull {
+		b.WriteString("ALTER TABLE " + qualifiedName(schema, table) + "\n    ALTER COLUMN " + quoteIdent(name) + " SET NOT NULL;\n")
+	} else {
+		b.WriteString("ALTER TABLE " + qualifiedName(schema, table) + "\n    ALTER COLUMN " + quoteIdent(name) + " DROP NOT NULL;\n")
+	}
+	if def != nil && *def != "" {
+		b.WriteString("ALTER TABLE " + qualifiedName(schema, table) + "\n    ALTER COLUMN " + quoteIdent(name) + " SET DEFAULT " + *def + ";\n")
+	} else {
+		b.WriteString("ALTER TABLE " + qualifiedName(schema, table) + "\n    ALTER COLUMN " + quoteIdent(name) + " DROP DEFAULT;\n")
+	}
+	return b.String(), nil
 }

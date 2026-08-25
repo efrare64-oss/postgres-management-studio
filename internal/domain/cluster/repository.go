@@ -27,7 +27,7 @@ type Repository interface {
 	ListTriggers(ctx context.Context, q connection.Querier, schema, table string) ([]Trigger, error)
 	ListTablespaces(ctx context.Context, q connection.Querier) ([]CatalogObject, error)
 	ListCatalogObjects(ctx context.Context, q connection.Querier, scope CatalogScope, kind string) ([]CatalogObject, error)
-	GetObjectSQL(ctx context.Context, q connection.Querier, schema, name, kind string) (string, error)
+	GetObjectSQL(ctx context.Context, q connection.Querier, schema, name, kind, table string) (string, error)
 	GetTableStats(ctx context.Context, q connection.Querier, schema, table string) (*TableStats, error)
 	GetColumnStats(ctx context.Context, q connection.Querier, schema, table string) ([]ColumnStat, error)
 	GetCompletionSchema(ctx context.Context, q connection.Querier) ([]CompletionTable, error)
