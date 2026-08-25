@@ -671,7 +671,13 @@ function TreeNode({ node, depth, isOpen, toggle, childrenOf, selectedKey, onSele
           <span className="invisible inline-flex h-[13px] w-[13px] shrink-0 items-center justify-center" />
         )}
         <span className={`inline-flex shrink-0 ${typeColor(node.type)}`}><Fa name={node.icon} /></span>
+        {node.type === 'column' && node.primaryKey && (
+          <span className="inline-flex shrink-0 text-[#c9a227]" title="Primary Key"><Fa name="key" style={{ fontSize: 11 }} /></span>
+        )}
         <span className="truncate">{node.label}</span>
+        {node.type === 'column' && !!node.detail && (
+          <span className="ml-1 shrink-0 whitespace-nowrap text-[11px] italic text-muted">{node.detail}</span>
+        )}
         {node.type === 'server' && !!node.data && (
           <span className="ml-auto hidden group-hover:inline-flex">
             <button className="cursor-pointer border-none bg-transparent p-0 text-[11px] text-muted hover:text-pg-blue" title="Editar servidor" onClick={(e) => { e.stopPropagation(); onManageServer(node.data as StudioServer); }}>
@@ -717,6 +723,8 @@ function node(partial: Partial<BuiltNode> & { key: string; type: string; label: 
     schema: partial.schema,
     name: partial.name,
     table: partial.table,
+    ...(partial.detail !== undefined && partial.detail !== '' ? { detail: partial.detail } : {}),
+    ...(partial.primaryKey ? { primaryKey: true } : {}),
   };
 }
 
@@ -943,6 +951,7 @@ async function loadCatalogObjects(n: BuiltNode): Promise<BuiltNode[]> {
     serverId: s,
     name: o.name,
     table: parent === 'table' || parent === 'constraints' ? name : undefined,
+    ...(leaf === 'column' ? { detail: o.detail, primaryKey: !!o.primary_key } : {}),
     data: o,
   }));
 }

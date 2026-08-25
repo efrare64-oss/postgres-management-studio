@@ -4,12 +4,13 @@ import { sql, PostgreSQL } from '@codemirror/lang-sql';
 import { autocompletion, closeBrackets, acceptCompletion, completionStatus } from '@codemirror/autocomplete';
 import { indentMore, toggleComment } from '@codemirror/commands';
 import { indentOnInput } from '@codemirror/language';
-import { highlightSelectionMatches, gotoLine } from '@codemirror/search';
+import { SearchQuery, findNext, findPrevious, gotoLine, highlightSelectionMatches, replaceAll, replaceNext, search, setSearchQuery } from '@codemirror/search';
 import { EditorView, highlightActiveLine, keymap } from '@codemirror/view';
 import { EditorSelection } from '@codemirror/state';
 import type { SQLNamespace } from '@codemirror/lang-sql';
 import { format as formatSqlText } from 'sql-formatter';
 import { api } from '../api';
+import { Fa } from '../icons';
 import { DataTable } from './ObjectPanel';
 import Modal from './Dialogs/Modal';
 import type { CompletionTable, HistoryItem, QueryBatch, QueryResult, StudioServer } from '../types';
@@ -55,6 +56,7 @@ const ssmsTheme = EditorView.theme({
     fontFamily: 'Consolas, "Courier New", monospace',
     fontSize: '13px',
   },
+  '.cm-scroller': { overflow: 'auto' },
   '.cm-gutters': {
     backgroundColor: '#f4f6f8',
     color: '#6b7280',
@@ -75,6 +77,8 @@ const ssmsTheme = EditorView.theme({
   '.cm-completionLabel': { fontFamily: 'Consolas, "Courier New", monospace' },
   '.cm-completionDetail': { fontStyle: 'normal', color: '#6b7280' },
 });
+
+const FIND_ICON_BTN = 'inline-flex h-[24px] w-[24px] shrink-0 cursor-pointer items-center justify-center rounded-sm border border-transparent bg-transparent text-[12px] text-[#5a6b7d] hover:border-border hover:bg-white hover:text-text';
 
 function buildSchema(tables: CompletionTable[]): { schema: SQLNamespace; defaultSchema: string | undefined } {
   const root: Record<string, Record<string, SQLNamespace>> = {};
@@ -240,6 +244,84 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
 
   const uppercaseSelection = () => changeSelectionCase((v) => v.toUpperCase());
   const lowercaseSelection = () => changeSelectionCase((v) => v.toLowerCase());
+
+  const [findOpen, setFindOpen] = useState(false);
+  const [findTab, setFindTab] = useState<'find' | 'replace'>('find');
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [wholeWord, setWholeWord] = useState(false);
+  const [useRegex, setUseRegex] = useState(false);
+  const findInputRef = useRef<HTMLInputElement | null>(null);
+  const replaceInputRef = useRef<HTMLInputElement | null>(null);
+
+  const buildFindQuery = useCallback(() => new SearchQuery({
+    search: findText,
+    replace: replaceText,
+    caseSensitive,
+    wholeWord,
+    regexp: useRegex,
+  }), [findText, replaceText, caseSensitive, wholeWord, useRegex]);
+
+  const applyFindQuery = (): boolean => {
+    if (!editorView || !findText.trim()) return false;
+    const q = buildFindQuery();
+    if (!q.valid) return false;
+    editorView.dispatch({ effects: setSearchQuery.of(q) });
+    return true;
+  };
+
+  const runFindCommand = (cmd: (view: EditorView) => void) => {
+    if (applyFindQuery() && editorView) cmd(editorView);
+  };
+  const doFindNext = () => runFindCommand(findNext);
+  const doFindPrevious = () => runFindCommand(findPrevious);
+  const doReplaceNext = () => runFindCommand(replaceNext);
+  const doReplaceAll = () => runFindCommand(replaceAll);
+
+  const closeFind = () => {
+    setFindOpen(false);
+    editorView?.focus();
+  };
+
+  const openFind = (tab: 'find' | 'replace') => {
+    if (editorView) {
+      const sel = editorView.state.selection.main;
+      if (!sel.empty) {
+        const text = editorView.state.sliceDoc(sel.from, sel.to).trim();
+        if (text && !text.includes('\n')) setFindText(text);
+      }
+    }
+    setFindTab(tab);
+    setFindOpen(true);
+  };
+
+  useEffect(() => {
+    if (!findOpen) return;
+    const t = window.setTimeout(() => {
+      const el = (findTab === 'replace' ? replaceInputRef : findInputRef).current ?? findInputRef.current;
+      el?.focus();
+      el?.select();
+    }, 30);
+    return () => window.clearTimeout(t);
+  }, [findOpen, findTab]);
+
+  const findMatchCount = useMemo(() => {
+    if (!findOpen || !editorView || !findText.trim()) return null;
+    const q = buildFindQuery();
+    if (!q.valid) return -1;
+    let n = 0;
+    try {
+      const cursor = q.getCursor(editorView.state.doc);
+      while (!cursor.next().done) {
+        n++;
+        if (n >= 10000) break;
+      }
+    } catch {
+      return -1;
+    }
+    return n;
+  }, [findOpen, editorView, findText, sqlText, buildFindQuery]);
 
   const downloadCsv = () => {
     const csvResults = results.filter((r) => r.columns.length > 0);
@@ -485,6 +567,18 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
         saveFile();
         return;
       }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        e.stopPropagation();
+        openFind('find');
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        e.stopPropagation();
+        openFind('replace');
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'o' || e.key === 'O')) {
         e.preventDefault();
         openFile();
@@ -502,7 +596,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [isActive, run, saveFile, saveFileAs, openFile, newFile]);
+  }, [isActive, run, saveFile, saveFileAs, openFile, newFile, openFind]);
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -525,6 +619,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     indentOnInput(),
     highlightActiveLine(),
     highlightSelectionMatches(),
+    search(),
     EditorView.lineWrapping,
     ssmsTheme,
     keymap.of([{
@@ -629,17 +724,92 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
         </div>
       )}
 
-      <div className={`query-editor border-b border-border ${showResults ? 'shrink-0' : 'min-h-0 flex-1'}`}>
-        <CodeMirror
-          value={sqlText}
-          height={showResults ? '220px' : '100%'}
-          theme="light"
-          extensions={extensions}
-          basicSetup={{ searchKeymap: false }}
-          onChange={(v) => setSqlText(v)}
-          onCreateEditor={(view) => setEditorView(view)}
-          placeholder="SELECT * FROM public.tabela;"
-        />
+      <div className={`query-editor flex min-h-0 flex-col border-b border-border ${showResults ? 'shrink-0' : 'min-h-0 flex-1'}`}>
+        <div className="relative min-h-[220px] flex-1">
+          <CodeMirror
+            value={sqlText}
+            height="100%"
+            className="h-full"
+            theme="light"
+            extensions={extensions}
+            basicSetup={{ searchKeymap: false }}
+            onChange={(v) => setSqlText(v)}
+            onCreateEditor={(view) => setEditorView(view)}
+            placeholder="SELECT * FROM public.tabela;"
+          />
+          {findOpen && (
+            <div className="absolute right-3 top-2 z-30 w-[350px] rounded-md border border-[#aeb9c4] bg-[#fbfcfe] shadow-[0_10px_28px_rgba(20,35,55,0.28)]">
+              <div className="flex items-center gap-0.5 border-b border-border-soft px-1 pt-0.5">
+                <button
+                  className={`cursor-pointer border-none bg-transparent px-2 py-1 text-[12px] ${findTab === 'find' ? 'border-b-2 border-pg-blue font-medium text-text' : 'text-muted hover:text-text'}`}
+                  onClick={() => setFindTab('find')}
+                >
+                  Localizar
+                </button>
+                <button
+                  className={`cursor-pointer border-none bg-transparent px-2 py-1 text-[12px] ${findTab === 'replace' ? 'border-b-2 border-pg-blue font-medium text-text' : 'text-muted hover:text-text'}`}
+                  onClick={() => setFindTab('replace')}
+                >
+                  Substituir
+                </button>
+                <span className="ml-auto pr-1 text-[10px] text-muted">
+                  {findMatchCount == null ? '' : findMatchCount === -1 ? 'regex inválida' : `${findMatchCount} corr.`}
+                </span>
+                <button className={FIND_ICON_BTN} title="Fechar (Esc)" onClick={closeFind}><Fa name="close" /></button>
+              </div>
+              <div className="flex flex-col gap-1.5 px-2 py-2">
+                <div className="flex items-center gap-1.5">
+                  <label className="w-[58px] shrink-0 text-right text-[11px] text-muted">Localizar:</label>
+                  <input
+                    ref={findInputRef}
+                    value={findText}
+                    onChange={(e) => setFindText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+                      else if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) doFindPrevious(); else doFindNext(); }
+                    }}
+                    placeholder="Texto ou expressão"
+                    className="h-7 min-w-0 flex-1 rounded-sm border border-border bg-white px-1.5 font-mono text-[12px] outline-none focus:border-pg-blue"
+                  />
+                  <button className={FIND_ICON_BTN} title="Anterior (Shift+Enter)" onClick={doFindPrevious}><Fa name="chevron-up" /></button>
+                  <button className={FIND_ICON_BTN} title="Próximo (Enter)" onClick={doFindNext}><Fa name="chevron-down" /></button>
+                </div>
+                {findTab === 'replace' && (
+                  <div className="flex items-center gap-1.5">
+                    <label className="w-[58px] shrink-0 text-right text-[11px] text-muted">Substituir:</label>
+                    <input
+                      ref={replaceInputRef}
+                      value={replaceText}
+                      onChange={(e) => setReplaceText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+                        else if (e.key === 'Enter') { e.preventDefault(); doReplaceNext(); }
+                      }}
+                      placeholder="Novo texto"
+                      className="h-7 min-w-0 flex-1 rounded-sm border border-border bg-white px-1.5 font-mono text-[12px] outline-none focus:border-pg-blue"
+                    />
+                    <button className={FIND_ICON_BTN} title="Substituir (Enter)" onClick={doReplaceNext}><Fa name="replace-one" /></button>
+                    <button className={FIND_ICON_BTN} title="Substituir tudo" onClick={doReplaceAll}><Fa name="replace-every" /></button>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-[64px]">
+                  <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-[#374151]">
+                    <input type="checkbox" checked={caseSensitive} onChange={(e) => setCaseSensitive(e.target.checked)} />
+                    Maiúsculas/minúsculas
+                  </label>
+                  <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-[#374151]">
+                    <input type="checkbox" checked={wholeWord} onChange={(e) => setWholeWord(e.target.checked)} />
+                    Palavra inteira
+                  </label>
+                  <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-[#374151]">
+                    <input type="checkbox" checked={useRegex} onChange={(e) => setUseRegex(e.target.checked)} />
+                    Regex
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {showResults && (

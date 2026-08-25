@@ -21,10 +21,10 @@ export default function Toolbar({ items }: ToolbarProps) {
           <Fa name={t.icon || 'database'} />
         </button>
       ))}
-      <div className="ml-auto flex items-center gap-1.5 rounded-[3px] border border-border-soft bg-[#fafbfc] px-2 py-0.5             text-[#7d858e]">
+      {/* <div className="ml-auto flex items-center gap-1.5 rounded-[3px] border border-border-soft bg-[#fafbfc] px-2 py-0.5             text-[#7d858e]">
         <Fa name="search" />
         <input placeholder="Quick search..." className="w-[170px] bg-transparent text-[13px] text-text outline-none" />
-      </div>
+      </div> */}
     </div>
   );
 }

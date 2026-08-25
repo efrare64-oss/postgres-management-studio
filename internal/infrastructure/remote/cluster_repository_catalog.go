@@ -387,7 +387,13 @@ func (r *ClusterRepository) relationObjects(ctx context.Context, q connection.Qu
 	switch kind {
 	case "columns":
 		query = `
-			SELECT a.attname, format_type(a.atttypid, a.atttypmod)
+			SELECT a.attname,
+			       format_type(a.atttypid, a.atttypmod),
+			       EXISTS (
+			           SELECT 1 FROM pg_constraint con
+			           WHERE con.conrelid = c.oid AND con.contype = 'p'
+			             AND a.attnum = ANY (con.conkey)
+			       )
 			FROM pg_attribute a
 			JOIN pg_class c ON c.oid = a.attrelid
 			JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -489,7 +495,11 @@ func (r *ClusterRepository) relationObjects(ctx context.Context, q connection.Qu
 	out := make([]cluster.CatalogObject, 0)
 	for rows.Next() {
 		var o cluster.CatalogObject
-		if err := rows.Scan(&o.Name, &o.Detail); err != nil {
+		if kind == "columns" {
+			if err := rows.Scan(&o.Name, &o.Detail, &o.PrimaryKey); err != nil {
+				return nil, fmt.Errorf("scan %s: %w", kind, err)
+			}
+		} else if err := rows.Scan(&o.Name, &o.Detail); err != nil {
 			return nil, fmt.Errorf("scan %s: %w", kind, err)
 		}
 		out = append(out, o)

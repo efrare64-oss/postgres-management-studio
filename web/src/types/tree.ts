@@ -10,4 +10,6 @@ export interface TreeNode {
   schema?: string | null;
   name?: string;
   table?: string | null;
+  detail?: string | null;
+  primaryKey?: boolean;
 }

@@ -173,7 +173,9 @@
 }
 
 /* ---------- Query tool / CodeMirror ---------- */
-.query-editor .cm-editor { font-size: 14px; }
+.query-editor .cm-editor { height: 100%; font-size: 14px; }
+.query-editor .cm-theme, .query-editor .cm-theme-light, .query-editor .cm-theme-dark { height: 100%; }
+.query-editor .cm-scroller { overflow-y: auto; overflow-x: auto; }
 
 /* ---------- Dark mode component overrides ---------- */
 .dark .btn { background: var(--color-btn-bg); border-color: var(--color-border); }

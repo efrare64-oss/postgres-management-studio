@@ -74,6 +74,7 @@ export interface TableDetail {
 export interface CatalogObject {
   name: string;
   detail?: string | null;
+  primary_key?: boolean;
 }
 
 export interface TableStats {

@@ -67,6 +67,7 @@ const ICONS: Record<string, string> = {
   'constraints:fk': 'fa fa-key',
   'constraints:exclusion': 'fa fa-ban',
   'constraints:index': 'fa fa-lock',
+  key: 'fa fa-key',
 
   tables: 'fa fa-table',
   views: 'fa fa-eye',
@@ -95,6 +96,10 @@ const ICONS: Record<string, string> = {
   history: 'fa fa-clock-o',
   save: 'fa fa-floppy-o',
   cancel: 'fa fa-times-circle-o',
+  'chevron-up': 'fa fa-chevron-up',
+  'chevron-down': 'fa fa-chevron-down',
+  'replace-one': 'fa fa-repeat',
+  'replace-every': 'fa fa-retweet',
   results: 'fa fa-table',
   messages: 'fa fa-comment-o',
   properties: 'fa fa-info-circle',
