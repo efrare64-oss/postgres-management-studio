@@ -16,16 +16,18 @@ import (
 	appquery "postgres-management-studio/internal/application/query"
 	appserver "postgres-management-studio/internal/application/server"
 	apptools "postgres-management-studio/internal/application/tools"
+	"postgres-management-studio/internal/config"
 	"postgres-management-studio/internal/domain/connection"
 	"postgres-management-studio/internal/infrastructure/http/handler"
 	"postgres-management-studio/internal/infrastructure/http/middleware"
+	"postgres-management-studio/internal/infrastructure/persistence"
 )
 
 type Server struct {
 	engine *gin.Engine
 }
 
-func New(serverSvc *appserver.Service, clusterSvc *appcluster.Service, querySvc *appquery.Service, groupSvc *appgroup.Service, toolsSvc *apptools.Service, conn connection.Provider, frontend fs.FS) *Server {
+func New(cfg *config.Config, serverSvc *appserver.Service, clusterSvc *appcluster.Service, querySvc *appquery.Service, groupSvc *appgroup.Service, toolsSvc *apptools.Service, conn connection.Provider, frontend fs.FS, settingsRepo *persistence.SettingsRepository) *Server {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery(), middleware.CORS())
 
@@ -34,6 +36,7 @@ func New(serverSvc *appserver.Service, clusterSvc *appcluster.Service, querySvc 
 	queryH := handler.NewQueryHandler(querySvc)
 	groupH := handler.NewGroupHandler(groupSvc)
 	toolsH := handler.NewToolsHandler(toolsSvc)
+	configH := handler.NewConfigHandler(cfg, settingsRepo)
 
 	api := r.Group("/api")
 	api.GET("/health", func(c *gin.Context) {
@@ -44,6 +47,7 @@ func New(serverSvc *appserver.Service, clusterSvc *appcluster.Service, querySvc 
 	queryH.Register(api)
 	groupH.Register(api)
 	toolsH.Register(api)
+	configH.Register(api)
 
 	if frontend != nil {
 		r.NoRoute(func(c *gin.Context) {

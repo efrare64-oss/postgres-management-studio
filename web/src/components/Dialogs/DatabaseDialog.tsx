@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { api } from '../../api';
 
@@ -9,6 +10,7 @@ interface DatabaseDialogProps {
 }
 
 export default function DatabaseDialog({ serverId, onSaved, onClose }: DatabaseDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [owner, setOwner] = useState('');
   const [busy, setBusy] = useState(false);
@@ -16,7 +18,7 @@ export default function DatabaseDialog({ serverId, onSaved, onClose }: DatabaseD
 
   const submit = async () => {
     setError(null);
-    if (!name.trim()) { setError('Informe o nome do banco.'); return; }
+    if (!name.trim()) { setError(t('dialog.database.required')); return; }
     setBusy(true);
     try {
       await api.createDatabase(serverId, name.trim(), owner.trim());
@@ -30,14 +32,14 @@ export default function DatabaseDialog({ serverId, onSaved, onClose }: DatabaseD
   };
 
   return (
-    <Modal title="Novo Database" onClose={onClose} width={440}>
+    <Modal title={t('dialog.database.title')} onClose={onClose} width={440}>
       <div className="form">
-        <div className="form-row"><label>Nome</label><input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></div>
-        <div className="form-row"><label>Owner</label><input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="postgres" /></div>
+        <div className="form-row"><label>{t('dialog.database.name')}</label><input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></div>
+        <div className="form-row"><label>{t('dialog.database.owner')}</label><input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="postgres" /></div>
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn primary" disabled={busy} onClick={submit}>{busy ? 'Criando...' : 'Criar database'}</button>
+          <button className="btn" onClick={onClose}>{t('dialog.cancel.button')}</button>
+          <button className="btn primary" disabled={busy} onClick={submit}>{busy ? t('dialog.database.creating') : t('dialog.database.create')}</button>
         </div>
       </div>
     </Modal>

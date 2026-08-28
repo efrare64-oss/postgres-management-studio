@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { api } from '../../api';
 import { Fa } from '../../icons';
@@ -11,6 +12,7 @@ interface RestoreDialogProps {
 }
 
 export default function RestoreDialog({ serverId, database, onClose }: RestoreDialogProps) {
+  const { t } = useTranslation();
   const [databases, setDatabases] = useState<DatabaseInfo[]>([]);
   const [binaries, setBinaries] = useState<ToolBinary[]>([]);
   const [file, setFile] = useState<File | null>(null);
@@ -48,9 +50,9 @@ export default function RestoreDialog({ serverId, database, onClose }: RestoreDi
 
   const submit = async () => {
     setError(null);
-    if (!file) { setError('Selecione um arquivo de backup.'); return; }
-    if (!form.database) { setError('Informe o banco de destino.'); return; }
-    if (form.data_only && form.schema_only) { setError('Data-only e Schema-only são mutuamente exclusivos.'); return; }
+    if (!file) { setError(t('dialog.restore.required_file')); return; }
+    if (!form.database) { setError(t('dialog.restore.required_db')); return; }
+    if (form.data_only && form.schema_only) { setError(t('dialog.restore.required_exclusive')); return; }
     setBusy(true);
     try {
       await api.restore(serverId, form, file);
@@ -69,31 +71,31 @@ export default function RestoreDialog({ serverId, database, onClose }: RestoreDi
   );
 
   return (
-    <Modal title="Restore" onClose={onClose} width={520}>
+    <Modal title={t('dialog.restore.title')} onClose={onClose} width={520}>
       <div className="form">
         {!requiredOk && (
           <div className="form-error">
             <Fa name="info" className="mr-1" />
-            {(plain ? psql : pgRestore)?.message || 'Binário necessário não encontrado'}
+            {(plain ? psql : pgRestore)?.message || t('dialog.restore.binary_not_found')}
           </div>
         )}
 
         <div className="form-row">
-          <label>Arquivo de backup</label>
+          <label>{t('dialog.restore.backup_file')}</label>
           <input type="file" accept=".backup,.tar,.sql,.gz,.dump,application/octet-stream,text/plain" onChange={(e) => setFile(e.target.files?.[0] || null)} />
         </div>
 
         <div className="form-row">
-          <label>Banco de destino</label>
+          <label>{t('dialog.restore.target_db')}</label>
           <select value={form.database} onChange={(e) => set('database', e.target.value)}>
             {databases.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
           </select>
         </div>
 
         <div className="form-row">
-          <label>Formato</label>
+          <label>{t('dialog.restore.format')}</label>
           <select value={form.format} onChange={(e) => set('format', e.target.value as RestoreOptions['format'])}>
-            <option value="auto">Auto (detectar)</option>
+            <option value="auto">{t('dialog.restore.auto_detect')}</option>
             <option value="plain">Plain (SQL) — via psql</option>
             <option value="custom">Custom</option>
             <option value="tar">Tar</option>
@@ -101,25 +103,25 @@ export default function RestoreDialog({ serverId, database, onClose }: RestoreDi
         </div>
 
         <div className="form-row check-group">
-          {!plain && check('clean', 'Limpar objetos antes')}
-          {!plain && check('create', 'Criar banco')}
-          {check('data_only', 'Somente dados')}
-          {check('schema_only', 'Somente schema')}
-          {check('verbose', 'Verbose')}
+          {!plain && check('clean', t('dialog.restore.clean'))}
+          {!plain && check('create', t('dialog.restore.create_db'))}
+          {check('data_only', t('dialog.restore.data_only'))}
+          {check('schema_only', t('dialog.restore.schema_only'))}
+          {check('verbose', t('dialog.restore.verbose'))}
         </div>
 
         {!plain && (
           <div className="form-row">
-            <label>Jobs (paralelismo)</label>
+            <label>{t('dialog.restore.jobs')}</label>
             <input type="number" min={1} value={form.jobs} onChange={(e) => set('jobs', Number(e.target.value) || 1)} />
           </div>
         )}
 
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose}>{t('dialog.cancel.button')}</button>
           <button className="btn primary" disabled={busy || !requiredOk} onClick={submit}>
-            {busy ? 'Restaurando...' : 'Restore'}
+            {busy ? t('dialog.restore.restoring') : t('dialog.restore.title')}
           </button>
         </div>
       </div>

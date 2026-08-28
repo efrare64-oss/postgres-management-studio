@@ -18,6 +18,7 @@ type Config struct {
 	PoolMaxConns   int
 	PoolMinConns   int
 	PoolMaxLifeMin int
+	Language       string
 }
 
 func Load() (*Config, error) {
@@ -36,6 +37,7 @@ func Load() (*Config, error) {
 		PoolMaxConns:   getEnvInt("POOL_MAX_CONNS", defaultMaxConns),
 		PoolMinConns:   getEnvInt("POOL_MIN_CONNS", 2),
 		PoolMaxLifeMin: getEnvInt("POOL_MAX_LIFE_MIN", 30),
+		Language:       getEnv("LANGUAGE", "en"),
 	}
 
 	if raw := os.Getenv("HTTP_PORT"); raw != "" {

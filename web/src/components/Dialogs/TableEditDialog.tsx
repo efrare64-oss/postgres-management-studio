@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { api } from '../../api';
 
@@ -12,6 +13,7 @@ interface TableEditDialogProps {
 }
 
 export default function TableEditDialog({ serverId, database, schema, table, onSaved, onClose }: TableEditDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState(table);
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
@@ -28,7 +30,7 @@ export default function TableEditDialog({ serverId, database, schema, table, onS
 
   const submit = async () => {
     setError(null);
-    if (!name.trim()) { setError('Informe o nome da tabela.'); return; }
+    if (!name.trim()) { setError(t('dialog.table_edit.required')); return; }
     setBusy(true);
     try {
       await api.patch(
@@ -48,15 +50,15 @@ export default function TableEditDialog({ serverId, database, schema, table, onS
   };
 
   return (
-    <Modal title="Editar tabela" onClose={onClose} width={440}>
+    <Modal title={t('dialog.table_edit.title')} onClose={onClose} width={440}>
       <div className="form">
-        <div className="form-row"><label>Schema</label><input value={schema} disabled /></div>
-        <div className="form-row"><label>Nome</label><input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></div>
-        <div className="form-row"><label>Comentário</label><textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={4} /></div>
+        <div className="form-row"><label>{t('dialog.table_edit.schema')}</label><input value={schema} disabled /></div>
+        <div className="form-row"><label>{t('dialog.table_edit.name')}</label><input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></div>
+        <div className="form-row"><label>{t('dialog.table_edit.comment')}</label><textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={4} /></div>
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn primary" disabled={busy} onClick={submit}>{busy ? 'Salvando...' : 'Salvar'}</button>
+          <button className="btn" onClick={onClose}>{t('dialog.cancel.button')}</button>
+          <button className="btn primary" disabled={busy} onClick={submit}>{busy ? t('dialog.table_edit.saving') : t('dialog.table_edit.save')}</button>
         </div>
       </div>
     </Modal>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { api } from '../../api';
 import { Fa } from '../../icons';
@@ -22,6 +23,7 @@ interface CreateTableDialogProps {
 }
 
 export default function CreateTableDialog({ serverId, database, schema, onSaved, onClose }: CreateTableDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [columns, setColumns] = useState<ColumnDraft[]>([{ name: '', type: 'integer', nullable: true, default: '', primary: false }]);
   const [busy, setBusy] = useState(false);
@@ -40,7 +42,7 @@ export default function CreateTableDialog({ serverId, database, schema, onSaved,
     setBusy(true);
     try {
       if (!serverId || !database || !schema) {
-        setError('Selecione um servidor, banco e schema antes de criar a tabela.');
+        setError(t('dialog.table.required_server'));
         setBusy(false);
         return;
       }
@@ -51,7 +53,7 @@ export default function CreateTableDialog({ serverId, database, schema, onSaved,
           .map((c) => ({ name: c.name.trim(), type: c.type, nullable: c.nullable, default: c.default, primary: c.primary })),
       };
       if (!payload.name.trim() || payload.columns.length === 0) {
-        setError('Informe o nome da tabela e ao menos uma coluna.');
+        setError(t('dialog.table.required_name'));
         setBusy(false);
         return;
       }
@@ -69,19 +71,19 @@ export default function CreateTableDialog({ serverId, database, schema, onSaved,
   };
 
   return (
-    <Modal title={`Criar tabela em ${schema || ''}`} onClose={onClose} width={620}>
+    <Modal title={t('dialog.table.title', { schema: schema || '' })} onClose={onClose} width={620}>
       <div className="form">
         <div className="form-row">
-          <label>Nome</label>
+          <label>{t('dialog.table.name')}</label>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </div>
-        <h4 className="section-title">Colunas</h4>
+        <h4 className="section-title">{t('dialog.table.columns')}</h4>
         <div className="column-editor">
           {columns.map((c, i) => (
             <div className="column-editor-row" key={i}>
               <input
                 className="col-name"
-                placeholder="nome"
+                placeholder={t('dialog.table.col_name')}
                 value={c.name}
                 onChange={(e) => updateColumn(i, { name: e.target.value })}
               />
@@ -96,18 +98,18 @@ export default function CreateTableDialog({ serverId, database, schema, onSaved,
               />
               <label className="col-check"><input type="checkbox" checked={c.nullable} onChange={(e) => updateColumn(i, { nullable: e.target.checked })} /> NULL</label>
               <label className="col-check"><input type="checkbox" checked={c.primary} onChange={(e) => updateColumn(i, { primary: e.target.checked })} /> PK</label>
-              <button className="icon-btn" onClick={() => removeColumn(i)} title="Remover">
+              <button className="icon-btn" onClick={() => removeColumn(i)} title={t('dialog.table.remove')}>
                 <Fa name="close" />
               </button>
             </div>
           ))}
-          <button className="btn" onClick={addColumn} title="Adicionar coluna"><Fa name="plus" /> Adicionar coluna</button>
+          <button className="btn" onClick={addColumn} title={t('dialog.table.add_column')}><Fa name="plus" /> {t('dialog.table.add_column')}</button>
         </div>
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose} title="Cancelar"><Fa name="cancel" /> Cancelar</button>
-          <button className="btn primary" disabled={busy} onClick={submit} title="Criar tabela">
-            {busy ? 'Criando...' : <><Fa name="table" /> Criar tabela</>}
+          <button className="btn" onClick={onClose} title={t('dialog.cancel.button')}><Fa name="cancel" /> {t('dialog.cancel.button')}</button>
+          <button className="btn primary" disabled={busy} onClick={submit} title={t('dialog.table.create')}>
+            {busy ? t('dialog.table.creating') : <><Fa name="table" /> {t('dialog.table.create')}</>}
           </button>
         </div>
       </div>

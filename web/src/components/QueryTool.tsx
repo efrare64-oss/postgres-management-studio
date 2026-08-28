@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql, PostgreSQL } from '@codemirror/lang-sql';
 import { autocompletion, closeBrackets, acceptCompletion, completionStatus } from '@codemirror/autocomplete';
@@ -78,7 +79,7 @@ const ssmsTheme = EditorView.theme({
   '.cm-completionDetail': { fontStyle: 'normal', color: '#6b7280' },
 });
 
-const FIND_ICON_BTN = 'inline-flex h-[24px] w-[24px] shrink-0 cursor-pointer items-center justify-center rounded-sm border border-transparent bg-transparent text-[12px] text-[#5a6b7d] hover:border-border hover:bg-white hover:text-text';
+const FIND_ICON_BTN = 'inline-flex h-[24px] w-[24px] shrink-0 cursor-pointer items-center justify-center rounded-sm border border-transparent bg-transparent text-[12px] text-muted hover:border-border hover:bg-tb-hover hover:text-text';
 
 function buildSchema(tables: CompletionTable[]): { schema: SQLNamespace; defaultSchema: string | undefined } {
   const root: Record<string, Record<string, SQLNamespace>> = {};
@@ -135,6 +136,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
   },
   ref,
 ) {
+  const { t } = useTranslation();
   const [sqlText, setSqlText] = useState(initialQuery || '');
   const [completion, setCompletion] = useState<CompletionTable[]>([]);
   const [tab, setTab] = useState('results');
@@ -194,10 +196,10 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     const dirty = text !== lastSavedSqlRef.current;
     dirtyRef.current = dirty;
     if (onTitleChange) {
-      const base = filename || 'Query Tool';
+      const base = filename || t('tab.query_tool');
       onTitleChange(dirty ? `${base} *` : base);
     }
-  }, [filename, onTitleChange]);
+  }, [filename, onTitleChange, t]);
 
   useEffect(() => {
     updateDirty(sqlText);
@@ -356,10 +358,10 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
   }, [editorView, sqlText]);
 
   const run = async (mode: 'execute' | 'explain' | 'explain-analyze') => {
-    if (!serverId) { setError('Selecione um servidor'); setTab('messages'); return; }
-    if (!database) { setError('Selecione um banco'); setTab('messages'); return; }
+    if (!serverId) { setError(t('query.select_server')); setTab('messages'); return; }
+    if (!database) { setError(t('query.select_database')); setTab('messages'); return; }
     const text = getActiveSql();
-    if (!text.trim()) { setError('Digite uma query'); setTab('messages'); return; }
+    if (!text.trim()) { setError(t('query.enter_query')); setTab('messages'); return; }
 
     const now = Date.now();
     if (now - lastRunRef.current < 250) return;
@@ -382,18 +384,18 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
       setTab(data.error ? 'messages' : 'results');
       const results = data.results ?? [];
       if (results.length === 0 && !data.error) {
-        pushMessage('Nenhum comando foi executado.');
+        pushMessage(t('query.no_command'));
       }
       results.forEach((r, idx) => {
         const label = results.length > 1 ? `[${idx + 1}] ` : '';
         const rows = r.rows ?? [];
         const columns = r.columns ?? [];
         if (mode !== 'execute') {
-          pushMessage(`${label}EXPLAIN ${mode === 'explain-analyze' ? 'ANALYZE ' : ''}em ${r.duration_ms} ms`);
+          pushMessage(`${label}${t('query.explain_result', { ms: r.duration_ms })}`);
         } else if (columns.length > 0) {
-          pushMessage(`${label}SELECT ${rows.length} linha(s) em ${r.duration_ms} ms`);
+          pushMessage(`${label}${t('query.select_result', { count: rows.length, ms: r.duration_ms })}`);
         } else {
-          pushMessage(`${label}${r.rows_affected} linha(s) afetada(s) em ${r.duration_ms} ms`);
+          pushMessage(`${label}${t('query.affected_result', { count: r.rows_affected, ms: r.duration_ms })}`);
         }
       });
       if (data.error) pushMessage(data.error);
@@ -431,10 +433,10 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
       setFilename(targetName);
       lastSavedSqlRef.current = sqlText;
       updateDirty(sqlText);
-      pushMessage(`Arquivo salvo: ${targetName}`);
+      pushMessage(t('query.file_saved', { name: targetName }));
       setTab('messages');
     } catch (err) {
-      setError(`Falha ao salvar: ${(err as Error).message}`);
+      setError(t('query.save_failed', { error: (err as Error).message }));
       setTab('messages');
     }
   };
@@ -463,7 +465,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
       }
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
-      setError(`Falha ao salvar: ${(err as Error).message}`);
+      setError(t('query.save_failed', { error: (err as Error).message }));
       setTab('messages');
     }
   };
@@ -493,7 +495,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
       }
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
-      setError(`Falha ao abrir: ${(err as Error).message}`);
+      setError(t('query.open_failed', { error: (err as Error).message }));
       setTab('messages');
     }
   };
@@ -515,7 +517,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     setResults([]);
     setMessages([]);
     setError(null);
-    if (onTitleChange) onTitleChange('Query Tool');
+    if (onTitleChange) onTitleChange(t('tab.query_tool'));
   });
 
   const clear = () => { setSqlText(''); setResults([]); setError(null); setMessages([]); };
@@ -673,7 +675,7 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
     saveFile,
     saveFileAs,
     newFile,
-    getTitle: () => filename || 'Query Tool',
+    getTitle: () => filename || t('tab.query_tool'),
     isDirty: () => dirtyRef.current,
     requestClose: () => {
       if (dirtyRef.current && tabId && onCloseRequest) {
@@ -708,17 +710,17 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
         onChange={onFallbackFileChange}
       />
       {historyOpen && (
-        <div className="max-h-[180px] shrink-0 overflow-auto border-b border-border bg-[#fafafa]">
-          <div className="flex items-center justify-between border-b border-[#eee] px-2.5 py-1">
-            <span className="text-xs font-medium text-muted">Histórico persistido</span>
-            <button className="cursor-pointer border-none bg-transparent text-xs text-danger" onClick={clearHistory}>Limpar histórico</button>
+        <div className="max-h-[180px] shrink-0 overflow-auto border-b border-border bg-panel-bg">
+          <div className="flex items-center justify-between border-b border-border px-2.5 py-1">
+            <span className="text-xs font-medium text-muted">{t('query.history_title')}</span>
+            <button className="cursor-pointer border-none bg-transparent text-xs text-danger" onClick={clearHistory}>{t('query.clear_history')}</button>
           </div>
-          {history.length === 0 && <div className="p-5 italic text-muted">Nenhuma query no histórico.</div>}
+          {history.length === 0 && <div className="p-5 italic text-muted">{t('query.no_history')}</div>}
           {history.map((h) => (
-            <div className="flex items-center gap-2 border-b border-[#eee] px-2.5 py-1.5" key={h.id}>
+            <div className="flex items-center gap-2 border-b border-border px-2.5 py-1.5" key={h.id}>
               <button className="truncate cursor-pointer border-none bg-transparent text-left font-mono text-xs text-pg-blue" onClick={() => setSqlText(h.query)}>{h.query}</button>
               <span className="ml-auto shrink-0 text-xs text-muted">{h.database}</span>
-              <span className={`shrink-0 text-xs whitespace-nowrap ${h.success ? 'text-muted' : 'text-danger'}`}>{h.success ? 'ok' : 'erro'}</span>
+              <span className={`shrink-0 text-xs whitespace-nowrap ${h.success ? 'text-muted' : 'text-danger'}`}>{h.success ? t('query.history_ok') : t('query.history_error')}</span>
             </div>
           ))}
         </div>
@@ -735,31 +737,31 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
             basicSetup={{ searchKeymap: false }}
             onChange={(v) => setSqlText(v)}
             onCreateEditor={(view) => setEditorView(view)}
-            placeholder="SELECT * FROM public.tabela;"
+            placeholder={t('query.placeholder')}
           />
           {findOpen && (
-            <div className="absolute right-3 top-2 z-30 w-[350px] rounded-md border border-[#aeb9c4] bg-[#fbfcfe] shadow-[0_10px_28px_rgba(20,35,55,0.28)]">
+            <div className="absolute right-3 top-2 z-30 w-[350px] rounded-md border border-border bg-panel-bg shadow-[0_10px_28px_rgba(20,35,55,0.28)]">
               <div className="flex items-center gap-0.5 border-b border-border-soft px-1 pt-0.5">
                 <button
                   className={`cursor-pointer border-none bg-transparent px-2 py-1 text-[12px] ${findTab === 'find' ? 'border-b-2 border-pg-blue font-medium text-text' : 'text-muted hover:text-text'}`}
                   onClick={() => setFindTab('find')}
                 >
-                  Localizar
+                  {t('query.find')}
                 </button>
                 <button
                   className={`cursor-pointer border-none bg-transparent px-2 py-1 text-[12px] ${findTab === 'replace' ? 'border-b-2 border-pg-blue font-medium text-text' : 'text-muted hover:text-text'}`}
                   onClick={() => setFindTab('replace')}
                 >
-                  Substituir
+                  {t('query.replace')}
                 </button>
                 <span className="ml-auto pr-1 text-[10px] text-muted">
-                  {findMatchCount == null ? '' : findMatchCount === -1 ? 'regex inválida' : `${findMatchCount} corr.`}
+                  {findMatchCount == null ? '' : findMatchCount === -1 ? t('query.invalid_regex') : `${findMatchCount} ${t('query.matches')}`}
                 </span>
-                <button className={FIND_ICON_BTN} title="Fechar (Esc)" onClick={closeFind}><Fa name="close" /></button>
+                <button className={FIND_ICON_BTN} title={t('query.close')} onClick={closeFind}><Fa name="close" /></button>
               </div>
               <div className="flex flex-col gap-1.5 px-2 py-2">
                 <div className="flex items-center gap-1.5">
-                  <label className="w-[58px] shrink-0 text-right text-[11px] text-muted">Localizar:</label>
+                  <label className="w-[58px] shrink-0 text-right text-[11px] text-muted">{t('query.find_label')}</label>
                   <input
                     ref={findInputRef}
                     value={findText}
@@ -768,15 +770,15 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
                       if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
                       else if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) doFindPrevious(); else doFindNext(); }
                     }}
-                    placeholder="Texto ou expressão"
-                    className="h-7 min-w-0 flex-1 rounded-sm border border-border bg-white px-1.5 font-mono text-[12px] outline-none focus:border-pg-blue"
+                    placeholder={t('query.find_placeholder')}
+                    className="h-7 min-w-0 flex-1 rounded-sm border border-border bg-menu-bg px-1.5 font-mono text-[12px] text-text outline-none focus:border-pg-blue"
                   />
-                  <button className={FIND_ICON_BTN} title="Anterior (Shift+Enter)" onClick={doFindPrevious}><Fa name="chevron-up" /></button>
-                  <button className={FIND_ICON_BTN} title="Próximo (Enter)" onClick={doFindNext}><Fa name="chevron-down" /></button>
+                  <button className={FIND_ICON_BTN} title={t('query.prev')} onClick={doFindPrevious}><Fa name="chevron-up" /></button>
+                  <button className={FIND_ICON_BTN} title={t('query.next')} onClick={doFindNext}><Fa name="chevron-down" /></button>
                 </div>
                 {findTab === 'replace' && (
                   <div className="flex items-center gap-1.5">
-                    <label className="w-[58px] shrink-0 text-right text-[11px] text-muted">Substituir:</label>
+                    <label className="w-[58px] shrink-0 text-right text-[11px] text-muted">{t('query.replace_label')}</label>
                     <input
                       ref={replaceInputRef}
                       value={replaceText}
@@ -785,25 +787,25 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
                         if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
                         else if (e.key === 'Enter') { e.preventDefault(); doReplaceNext(); }
                       }}
-                      placeholder="Novo texto"
-                      className="h-7 min-w-0 flex-1 rounded-sm border border-border bg-white px-1.5 font-mono text-[12px] outline-none focus:border-pg-blue"
+                      placeholder={t('query.replace_placeholder')}
+                      className="h-7 min-w-0 flex-1 rounded-sm border border-border bg-menu-bg px-1.5 font-mono text-[12px] text-text outline-none focus:border-pg-blue"
                     />
-                    <button className={FIND_ICON_BTN} title="Substituir (Enter)" onClick={doReplaceNext}><Fa name="replace-one" /></button>
-                    <button className={FIND_ICON_BTN} title="Substituir tudo" onClick={doReplaceAll}><Fa name="replace-every" /></button>
+                    <button className={FIND_ICON_BTN} title={t('query.replace_next')} onClick={doReplaceNext}><Fa name="replace-one" /></button>
+                    <button className={FIND_ICON_BTN} title={t('query.replace_all')} onClick={doReplaceAll}><Fa name="replace-every" /></button>
                   </div>
                 )}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-[64px]">
-                  <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-[#374151]">
+                  <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-text">
                     <input type="checkbox" checked={caseSensitive} onChange={(e) => setCaseSensitive(e.target.checked)} />
-                    Maiúsculas/minúsculas
+                    {t('query.case_sensitive')}
                   </label>
-                  <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-[#374151]">
+                  <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-text">
                     <input type="checkbox" checked={wholeWord} onChange={(e) => setWholeWord(e.target.checked)} />
-                    Palavra inteira
+                    {t('query.whole_word')}
                   </label>
-                  <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-[#374151]">
+                  <label className="flex cursor-pointer select-none items-center gap-1 text-[11px] text-text">
                     <input type="checkbox" checked={useRegex} onChange={(e) => setUseRegex(e.target.checked)} />
-                    Regex
+                    {t('query.regex')}
                   </label>
                 </div>
               </div>
@@ -822,10 +824,10 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
                   const columns = r.columns ?? [];
                   return (
                     <div key={i} className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-border">
-                      <div className="flex shrink-0 items-center justify-between border-b border-border bg-[#f0f2f5] px-2.5 py-1">
+                      <div className="flex shrink-0 items-center justify-between border-b border-border bg-menu-bg px-2.5 py-1">
                         <span className="text-[12px] font-medium text-muted">
-                          {results.length > 1 ? `Resultado ${i + 1}` : 'Resultado'}
-                          {columns.length > 0 ? ` — ${rows.length} linha(s)` : ` — ${r.rows_affected} linha(s) afetada(s)`}
+                          {t('query.result')}
+                          {columns.length > 0 ? ` — ${t('query.rows', { count: rows.length })}` : ` — ${t('query.rows_affected', { count: r.rows_affected })}`}
                         </span>
                         <span className="text-[11px] text-muted">{r.duration_ms} ms</span>
                       </div>
@@ -835,14 +837,14 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
                 })}
               </div>
             ) : (
-              <div className="p-5 italic text-muted">Execute uma query para ver os resultados.</div>
+              <div className="p-5 italic text-muted">{t('query.execute_hint')}</div>
             )
           )}
           {tab === 'messages' && (
             <div className="flex flex-col gap-1.5 p-2">
               {error && <div className="rounded border border-[#e5b3b0] bg-[#fdecea] px-2.5 py-1.5"><pre className="m-0 font-mono text-[13px] text-danger whitespace-pre-wrap">{error}</pre></div>}
               {messages.map((m, i) => <div className="rounded border border-[#cfe3cf] bg-[#eef7ee] px-2.5 py-1.5" key={i}><pre className="m-0 font-mono text-[13px] whitespace-pre-wrap text-[#1a5a1a]">{m}</pre></div>)}
-              {!error && messages.length === 0 && <div className="p-5 italic text-muted">Nenhuma mensagem.</div>}
+              {!error && messages.length === 0 && <div className="p-5 italic text-muted">{t('query.no_messages')}</div>}
             </div>
           )}
         </div>
@@ -850,35 +852,35 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
 
       {showResults && (
         <div className="flex shrink-0 border-t border-border bg-tab-bg">
-          <button className={`cursor-pointer border-none border-r border-border px-4 py-1.5 text-[13px] text-[#4a5560] hover:bg-[#d7dbe1] ${tab === 'results' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('results')}>
-            Resultados {results.length > 0 ? `(${totalRows})` : ''}
+          <button className={`cursor-pointer border-none border-r border-border px-4 py-1.5 text-[13px] text-muted hover:bg-tb-hover ${tab === 'results' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium text-text' : ''}`} onClick={() => setTab('results')}>
+            {t('query.results')} {results.length > 0 ? `(${totalRows})` : ''}
           </button>
-          <button className={`cursor-pointer border-none border-r border-border px-4 py-1.5 text-[13px] text-[#4a5560] hover:bg-[#d7dbe1] ${tab === 'messages' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('messages')}>
-            Mensagens {messages.length || error ? `(${messages.length + (error ? 1 : 0)})` : ''}
+          <button className={`cursor-pointer border-none border-r border-border px-4 py-1.5 text-[13px] text-muted hover:bg-tb-hover ${tab === 'messages' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium text-text' : ''}`} onClick={() => setTab('messages')}>
+            {t('query.messages')} {messages.length || error ? `(${messages.length + (error ? 1 : 0)})` : ''}
           </button>
           {results.some((r) => r.columns.length > 0) && (
-            <button className="ml-auto cursor-pointer border-none border-l border-border px-4 py-1.5 text-[13px] text-pg-blue hover:bg-[#d7dbe1]" onClick={downloadCsv} title="Baixar resultados em CSV">
-              Baixar CSV
+            <button className="ml-auto cursor-pointer border-none border-l border-border px-4 py-1.5 text-[13px] text-pg-blue hover:bg-[#d7dbe1]" onClick={downloadCsv} title={t('query.download_csv')}>
+              {t('query.csv')}
             </button>
           )}
         </div>
       )}
 
-      <div className="shrink-0 border-t border-border-soft bg-[#f4f6f8] px-2.5 py-1 text-xs text-muted">
-        {selectedServer ? `${selectedServer.name} / ${database}` : 'Selecione um servidor'}
-        {filename && ` • ${filename}${dirtyRef.current ? ' (modificado)' : ''}`}
+      <div className="shrink-0 border-t border-border-soft bg-menu-bg px-2.5 py-1 text-xs text-muted">
+        {selectedServer ? `${selectedServer.name} / ${database}` : t('query.select_server')}
+        {filename && ` • ${filename}${dirtyRef.current ? ` ${t('query.modified')}` : ''}`}
         {results.length > 0 && ` • ${results.reduce((t, r) => t + r.duration_ms, 0)} ms`}
-        {running && ' • executando...'}
+        {running && ` • ${t('query.running')}`}
       </div>
 
       {unsavedOpen && (
-        <Modal title="Alterações não salvas" onClose={handleUnsavedCancel} width={440}>
+        <Modal title={t('query.unsaved_title')} onClose={handleUnsavedCancel} width={440}>
           <div className="form">
-            <p className="text-[13px] text-[#374151]">O editor contém alterações não salvas. Deseja salvá-las antes de fechar?</p>
+            <p className="text-[13px] text-text">{t('query.unsaved_msg')}</p>
             <div className="form-actions">
-              <button className="btn" onClick={handleUnsavedCancel}>Cancelar</button>
-              <button className="btn" onClick={handleUnsavedDiscard}>Não salvar</button>
-              <button className="btn primary" onClick={handleUnsavedSave}>Salvar</button>
+              <button className="btn" onClick={handleUnsavedCancel}>{t('dialog.cancel.button')}</button>
+              <button className="btn" onClick={handleUnsavedDiscard}>{t('query.dont_save')}</button>
+              <button className="btn primary" onClick={handleUnsavedSave}>{t('query.save')}</button>
             </div>
           </div>
         </Modal>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { api } from '../../api';
 import { Fa } from '../../icons';
@@ -12,6 +13,7 @@ interface BackupDialogProps {
 }
 
 export default function BackupDialog({ serverId, database, table, onClose }: BackupDialogProps) {
+  const { t } = useTranslation();
   const [databases, setDatabases] = useState<DatabaseInfo[]>([]);
   const [binaries, setBinaries] = useState<ToolBinary[]>([]);
   const [form, setForm] = useState<BackupOptions>({
@@ -46,8 +48,8 @@ export default function BackupDialog({ serverId, database, table, onClose }: Bac
 
   const submit = async () => {
     setError(null);
-    if (!form.database) { setError('Informe o banco.'); return; }
-    if (form.data_only && form.schema_only) { setError('Data-only e Schema-only são mutuamente exclusivos.'); return; }
+    if (!form.database) { setError(t('dialog.backup.required_db')); return; }
+    if (form.data_only && form.schema_only) { setError(t('dialog.backup.required_exclusive')); return; }
     setBusy(true);
     try {
       const res = await api.backup(serverId, form);
@@ -74,24 +76,24 @@ export default function BackupDialog({ serverId, database, table, onClose }: Bac
   );
 
   return (
-    <Modal title="Backup" onClose={onClose} width={520}>
+    <Modal title={t('dialog.backup.title')} onClose={onClose} width={520}>
       <div className="form">
         {pgDump && !pgDump.found && (
           <div className="form-error">
             <Fa name="info" className="mr-1" />
-            {pgDump.message || 'pg_dump não encontrado'}
+            {pgDump.message || t('dialog.backup.pg_dump_not_found')}
           </div>
         )}
 
         <div className="form-row">
-          <label>Banco</label>
+          <label>{t('dialog.backup.database')}</label>
           <select value={form.database} onChange={(e) => set('database', e.target.value)}>
             {databases.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
           </select>
         </div>
 
         <div className="form-row">
-          <label>Formato</label>
+          <label>{t('dialog.backup.format')}</label>
           <select value={form.format} onChange={(e) => set('format', e.target.value as BackupOptions['format'])}>
             <option value="custom">Custom (*.backup)</option>
             <option value="plain">Plain (SQL)</option>
@@ -100,39 +102,39 @@ export default function BackupDialog({ serverId, database, table, onClose }: Bac
         </div>
 
         <div className="form-row">
-          <label>Nome do arquivo</label>
-          <input value={form.filename} onChange={(e) => set('filename', e.target.value)} placeholder="Deixe em branco para usar o padrão" />
+          <label>{t('dialog.backup.filename')}</label>
+          <input value={form.filename} onChange={(e) => set('filename', e.target.value)} placeholder={t('dialog.backup.filename_hint')} />
         </div>
 
         {form.format === 'custom' && (
           <div className="form-row">
-            <label>Jobs (paralelismo)</label>
+            <label>{t('dialog.backup.jobs')}</label>
             <input type="number" min={1} value={form.jobs} onChange={(e) => set('jobs', Number(e.target.value) || 1)} />
           </div>
         )}
 
         <div className="form-row check-group">
-          {check('gzip', 'Comprimir (Gzip)')}
-          {check('data_only', 'Somente dados')}
-          {check('schema_only', 'Somente schema')}
-          {check('verbose', 'Verbose')}
+          {check('gzip', t('dialog.backup.compress'))}
+          {check('data_only', t('dialog.backup.data_only'))}
+          {check('schema_only', t('dialog.backup.schema_only'))}
+          {check('verbose', t('dialog.backup.verbose'))}
         </div>
 
         <div className="form-row">
-          <label>Filtrar schema</label>
-          <input value={form.schema} onChange={(e) => set('schema', e.target.value)} placeholder="ex.: public" />
+          <label>{t('dialog.backup.filter_schema')}</label>
+          <input value={form.schema} onChange={(e) => set('schema', e.target.value)} placeholder={t('dialog.backup.filter_schema_hint')} />
         </div>
 
         <div className="form-row">
-          <label>Filtrar tabela</label>
-          <input value={form.table} onChange={(e) => set('table', e.target.value)} placeholder={table || 'ex.: public.minha_tabela'} />
+          <label>{t('dialog.backup.filter_table')}</label>
+          <input value={form.table} onChange={(e) => set('table', e.target.value)} placeholder={table || t('dialog.backup.filter_table_hint')} />
         </div>
 
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose}>{t('dialog.cancel.button')}</button>
           <button className="btn primary" disabled={busy || !pgDump?.found} onClick={submit}>
-            {busy ? 'Gerando backup...' : 'Backup'}
+            {busy ? t('dialog.backup.generating') : t('dialog.backup.title')}
           </button>
         </div>
       </div>

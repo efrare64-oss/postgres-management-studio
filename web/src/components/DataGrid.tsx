@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import { Fa } from '../icons';
 import type { TableData, TableDataSave } from '../types';
@@ -13,6 +14,7 @@ interface DataGridProps {
 const PAGE_SIZE = 100;
 
 export default function DataGrid({ serverId, database, schema, table }: DataGridProps) {
+  const { t } = useTranslation();
   const [data, setData] = useState<TableData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export default function DataGrid({ serverId, database, schema, table }: DataGrid
   if (!data) {
     return (
       <div className="p-5">
-        {loading && <div className="italic text-muted">Carregando dados...</div>}
+        {loading && <div className="italic text-muted">{t('dg.loading')}</div>}
         {error && <div className="text-danger">{error}</div>}
       </div>
     );
@@ -112,7 +114,7 @@ export default function DataGrid({ serverId, database, schema, table }: DataGrid
       }
 
       const res = await api.saveTableData(serverId, database, schema, table, saveInput);
-      setMessage(`Salvo: ${res.inserted} inserido(s), ${res.updated} atualizado(s), ${res.deleted} excluído(s)`);
+      setMessage(t('dg.saved', { inserted: res.inserted, updated: res.updated, deleted: res.deleted }));
       await load(offset);
     } catch (err) {
       setError((err as Error).message);
@@ -146,20 +148,20 @@ export default function DataGrid({ serverId, database, schema, table }: DataGrid
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-[#f4f6f8] px-3 py-2">
         <span className="text-[13px] text-muted">
-          {data.total} linha(s) • página {page} de {pages} {!data.has_pk && <span title="Tabela sem chave primária: atualização/exclusão pode falhar.">• sem PK</span>}
+          {t('dg.page_info', { total: data.total, page, pages })} {!data.has_pk && <span title={t('dg.no_pk_hint')}>{t('dg.no_pk')}</span>}
         </span>
         <div className="ml-auto flex gap-1.5">
-          <button className="btn" onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))} disabled={offset === 0}>Anterior</button>
-          <button className="btn" onClick={() => setOffset((o) => o + PAGE_SIZE)} disabled={offset + PAGE_SIZE >= data.total}>Próxima</button>
-          <button className="btn" onClick={addRow}><Fa name="plus" /> Nova linha</button>
-          <label className="btn cursor-pointer" title="Importar CSV">
+          <button className="btn" onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))} disabled={offset === 0}>{t('dg.prev')}</button>
+          <button className="btn" onClick={() => setOffset((o) => o + PAGE_SIZE)} disabled={offset + PAGE_SIZE >= data.total}>{t('dg.next')}</button>
+          <button className="btn" onClick={addRow}><Fa name="plus" /> {t('dg.new_row')}</button>
+          <label className="btn cursor-pointer" title={t('dg.import_csv')}>
             <Fa name="upload" />
-            {' '}{importBusy ? 'Importando...' : 'Importar CSV'}
+            {' '}{importBusy ? t('dg.importing') : t('dg.import_csv')}
             <input type="file" accept=".csv,text/csv" className="hidden" disabled={importBusy} onChange={onImportFile} />
           </label>
           <a className="btn" href={api.tableDataExportUrl(serverId, database, schema, table)} download>CSV</a>
           <button className="btn primary" onClick={save} disabled={!dirty || busy}>
-            {busy ? 'Salvando...' : 'Salvar alterações'}
+            {busy ? t('dg.saving') : t('dg.save_changes')}
           </button>
         </div>
       </div>
@@ -201,7 +203,7 @@ export default function DataGrid({ serverId, database, schema, table }: DataGrid
                     </td>
                   ))}
                   <td className="border border-[#e2e5e9] px-1 py-1 text-center">
-                    <button className="icon-btn" title={isDeleted ? 'Desfazer exclusão' : 'Excluir linha'} onClick={() => deleteRow(rowIdx)}>
+                    <button className="icon-btn" title={isDeleted ? t('dg.undo_delete') : t('dg.delete_row')} onClick={() => deleteRow(rowIdx)}>
                       <Fa name={isDeleted ? 'refresh' : 'close'} />
                     </button>
                   </td>
@@ -221,7 +223,7 @@ export default function DataGrid({ serverId, database, schema, table }: DataGrid
                   </td>
                 ))}
                 <td className="border border-[#e2e5e9] px-1 py-1 text-center">
-                  <button className="icon-btn" title="Remover linha nova" onClick={() => removeAdded(rowIdx)}>
+                  <button className="icon-btn" title={t('dg.remove_new_row')} onClick={() => removeAdded(rowIdx)}>
                     <Fa name="close" />
                   </button>
                 </td>
@@ -229,7 +231,7 @@ export default function DataGrid({ serverId, database, schema, table }: DataGrid
             ))}
           </tbody>
         </table>
-        {!data.rows.length && !added.length && <div className="p-5 italic text-muted">Tabela vazia.</div>}
+        {!data.rows.length && !added.length && <div className="p-5 italic text-muted">{t('dg.empty_table')}</div>}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Fa } from '../../icons';
 
 interface ModalProps {
@@ -9,6 +10,7 @@ interface ModalProps {
 }
 
 export default function Modal({ title, onClose, children, width = 520 }: ModalProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -20,7 +22,7 @@ export default function Modal({ title, onClose, children, width = 520 }: ModalPr
       <div className="modal" style={{ width }} onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <span className="modal-title">{title}</span>
-          <button className="icon-btn" onClick={onClose} title="Fechar">
+          <button className="icon-btn" onClick={onClose} title={t('modal.close')}>
             <Fa name="close" />
           </button>
         </div>

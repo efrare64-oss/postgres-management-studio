@@ -83,6 +83,11 @@ CREATE TABLE IF NOT EXISTS query_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_query_history_created_at ON query_history (created_at);
+
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 `
 
 func ensureSchema(ctx context.Context, db *sql.DB) error {

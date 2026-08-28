@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { Fa } from '../icons';
@@ -201,6 +202,7 @@ interface BuiltNode extends TreeNode {
 }
 
 export default function BrowserPanel({ servers, groups, selectedKey, refreshKey = 0, onSelect, onManageServer, onRefresh, onAction }: BrowserPanelProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [cache, setCache] = useState<Record<string, BuiltNode[]>>({});
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -302,15 +304,15 @@ export default function BrowserPanel({ servers, groups, selectedKey, refreshKey 
   return (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-border bg-[#eef0f3] px-2 py-1.5 font-medium">
-        <span className="flex items-center gap-1.5 text-[#2f4156]"><Fa name="server" /> Servers</span>
+        <span className="flex items-center gap-1.5 text-[#2f4156]"><Fa name="server" /> {t('app.name')}</span>
         <div className="flex gap-1">
-          <button className="inline-flex cursor-pointer rounded p-0.5 text-muted hover:bg-tb-hover hover:text-text" title="Atualizar" onClick={refresh}><Fa name="refresh" /></button>
+          <button className="inline-flex cursor-pointer rounded p-0.5 text-muted hover:bg-tb-hover hover:text-text" title="Refresh" onClick={refresh}><Fa name="refresh" /></button>
         </div>
       </div>
       <div className="flex-1 overflow-auto p-1">
         {!rootChildren.length && (
           <button className="m-1.5 w-[calc(100%-12px)] cursor-pointer rounded border border-border bg-[#f7f7f7] p-1.5 hover:bg-[#ececec]" onClick={() => load({ key: 'root', type: 'root', label: 'Servers', icon: 'falcon', loadable: true })}>
-            Carregar árvore
+            {t('tree.load')}
           </button>
         )}
         {rootChildren.map((g) => (
@@ -328,8 +330,8 @@ export default function BrowserPanel({ servers, groups, selectedKey, refreshKey 
             onAction={onAction}
           />
         ))}
-        {!rootChildren.length && <div className="p-5 italic text-muted">Nenhum servidor.</div>}
-        {rootChildren.length > 0 && !selectedKey && <div className="px-2.5 py-2 text-xs italic text-muted">Clique em um objeto para ver propriedades.</div>}
+        {!rootChildren.length && <div className="p-5 italic text-muted">{t('tree.no_servers')}</div>}
+        {rootChildren.length > 0 && !selectedKey && <div className="px-2.5 py-2 text-xs italic text-muted">{t('tree.click_object')}</div>}
       </div>
       {contextMenu && (
         <ContextMenu menu={contextMenu} onClose={() => setContextMenu(null)} />
@@ -639,6 +641,7 @@ interface TreeNodeProps {
 }
 
 function TreeNode({ node, depth, isOpen, toggle, childrenOf, selectedKey, onSelect, onManageServer, onOpenContext, onAction }: TreeNodeProps) {
+  const { t } = useTranslation();
   const children = childrenOf(node.key);
   const open = isOpen(node.key);
   const selected = selectedKey === node.key;
@@ -680,8 +683,8 @@ function TreeNode({ node, depth, isOpen, toggle, childrenOf, selectedKey, onSele
         )}
         {node.type === 'server' && !!node.data && (
           <span className="ml-auto hidden group-hover:inline-flex">
-            <button className="cursor-pointer border-none bg-transparent p-0 text-[11px] text-muted hover:text-pg-blue" title="Editar servidor" onClick={(e) => { e.stopPropagation(); onManageServer(node.data as StudioServer); }}>
-              editar
+            <button className="cursor-pointer border-none bg-transparent p-0 text-[11px] text-muted hover:text-pg-blue" title={t('tree.edit_server')} onClick={(e) => { e.stopPropagation(); onManageServer(node.data as StudioServer); }}>
+              {t('tree.edit')}
             </button>
           </span>
         )}
@@ -703,7 +706,7 @@ function TreeNode({ node, depth, isOpen, toggle, childrenOf, selectedKey, onSele
               onAction={onAction}
             />
           ))}
-          {!children.length && node.loadable && <div className="px-1.5 py-1 text-[13px] italic text-muted">(sem itens)</div>}
+          {!children.length && node.loadable && <div className="px-1.5 py-1 text-[13px] italic text-muted">{t('tree.no_items')}</div>}
         </div>
       )}
     </div>

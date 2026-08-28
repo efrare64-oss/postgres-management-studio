@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 
 interface ConfirmDialogProps {
@@ -11,7 +12,8 @@ interface ConfirmDialogProps {
   onClose: () => void;
 }
 
-export default function ConfirmDialog({ title, message, confirmLabel = 'Confirmar', danger, busy: externalBusy, onConfirm, onClose }: ConfirmDialogProps) {
+export default function ConfirmDialog({ title, message, confirmLabel, danger, busy: externalBusy, onConfirm, onClose }: ConfirmDialogProps) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const running = externalBusy ?? busy;
@@ -35,9 +37,9 @@ export default function ConfirmDialog({ title, message, confirmLabel = 'Confirma
         <p className="text-[13px] text-[#374151]">{message}</p>
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose}>{t('dialog.cancel.button')}</button>
           <button className={`btn ${danger ? 'danger' : 'primary'}`} disabled={running} onClick={submit}>
-            {running ? 'Executando...' : confirmLabel}
+            {running ? '...' : (confirmLabel ?? t('dialog.confirm.button'))}
           </button>
         </div>
       </div>

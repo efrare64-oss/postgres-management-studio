@@ -6,8 +6,8 @@
 
   --color-pg-blue: #326690;
   --color-pg-blue-dark: #2a567a;
-  --color-pg-header-top: #9e9289;
-  --color-pg-header-bottom: #8a7f77;
+  --color-pg-header-top: transparent;
+  --color-pg-header-bottom: transparent;
   --color-pg-bg: #eef1f4;
   --color-panel-bg: #ffffff;
   --color-border: #c7c7c7;
@@ -248,6 +248,29 @@
 .dark .hover\:bg-\[#eceaea\]:hover { background: var(--color-btn-hover) !important; }
 .dark .hover\:bg-\[#ececec\]:hover { background: var(--color-btn-hover) !important; }
 .dark .hover\:bg-\[#e2e6ec\]:hover { background: var(--color-dropdown-hover) !important; }
+
+.dark .bg-white { background: var(--color-panel-bg) !important; }
+.dark .bg-\[#f6f7f8\] { background: var(--color-panel-bg) !important; }
+.dark .bg-\[#f0f2f4\] { background: var(--color-status-bg) !important; }
+.dark .bg-\[#f7f9fb\] { background: var(--color-panel-bg) !important; }
+.dark .bg-\[#fbfcfe\] { background: var(--color-panel-bg) !important; }
+.dark .bg-\[#cfe0ef\] { background: var(--color-selected) !important; }
+.dark .bg-\[#e2e6ec\] { background: var(--color-tb-hover) !important; }
+.dark .hover\:bg-white:hover { background: var(--color-btn-hover) !important; }
+.dark .focus\:bg-\[#eef4fa\]:focus { background: var(--color-hover) !important; }
+
+.dark .border-\[#e5e7eb\] { border-color: var(--color-border) !important; }
+.dark .border-\[#aeb9c4\] { border-color: var(--color-border) !important; }
+
+.dark .text-\[#8a5a00\] { color: #d4a017 !important; }
+.dark .text-\[#a03a3a\] { color: #e06060 !important; }
+.dark .text-\[#5a7a2a\] { color: #7ab347 !important; }
+.dark .text-\[#7a3aa0\] { color: #a666d4 !important; }
+.dark .text-\[#2a7a2a\] { color: #5ab35a !important; }
+.dark .text-\[#7a8694\] { color: var(--color-muted) !important; }
+.dark .text-\[#c9a227\] { color: #e0b830 !important; }
+.dark .text-\[#5a6b7d\] { color: var(--color-muted) !important; }
+.dark .text-\[#c3d7e8\] { color: #a0b8d0 !important; }
 
 .dark .cm-editor { background: var(--color-editor-bg); }
 .dark .cm-theme-dark .cm-editor { background: var(--color-editor-bg); }

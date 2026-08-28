@@ -13,7 +13,7 @@ export default function Toolbar({ items }: ToolbarProps) {
       ) : (
         <button
           key={t.key}
-          className="inline-flex h-7 w-8 cursor-pointer items-center justify-center rounded-[3px] border border-transparent bg-transparent text-[#4b5563] hover:border-[#b9c8d6] hover:bg-tb-hover hover:text-[#1f2937] disabled:cursor-default disabled:text-[#c3c9d0]"
+          className="inline-flex h-7 w-8 cursor-pointer items-center justify-center rounded-[3px] border border-transparent bg-transparent text-muted hover:border-border hover:bg-tb-hover hover:text-text disabled:cursor-default disabled:text-[#c3c9d0]"
           title={t.label}
           disabled={t.enabled === false}
           onClick={t.onClick}
@@ -21,10 +21,6 @@ export default function Toolbar({ items }: ToolbarProps) {
           <Fa name={t.icon || 'database'} />
         </button>
       ))}
-      {/* <div className="ml-auto flex items-center gap-1.5 rounded-[3px] border border-border-soft bg-[#fafbfc] px-2 py-0.5             text-[#7d858e]">
-        <Fa name="search" />
-        <input placeholder="Quick search..." className="w-[170px] bg-transparent text-[13px] text-text outline-none" />
-      </div> */}
     </div>
   );
 }

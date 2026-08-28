@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { api } from '../../api';
 import { Fa } from '../../icons';
@@ -22,6 +23,7 @@ interface RoleForm {
 }
 
 export default function RoleDialog({ serverId, role, onSaved, onClose }: RoleDialogProps) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<RoleForm>(role
     ? {
         name: role.name,
@@ -47,7 +49,7 @@ export default function RoleDialog({ serverId, role, onSaved, onClose }: RoleDia
     setBusy(true);
     try {
       if (!serverId) {
-        setError('Selecione um servidor.');
+        setError(t('dialog.role.required_server'));
         setBusy(false);
         return;
       }
@@ -63,7 +65,7 @@ export default function RoleDialog({ serverId, role, onSaved, onClose }: RoleDia
       if (role) {
         await api.patch(`/servers/${serverId}/roles/${encodeURIComponent(role.name)}`, payload);
       } else {
-        if (!form.name.trim()) { setError('Informe o nome da role.'); setBusy(false); return; }
+        if (!form.name.trim()) { setError(t('dialog.role.required_name')); setBusy(false); return; }
         await api.post(`/servers/${serverId}/roles`, payload);
       }
       onSaved();
@@ -82,31 +84,31 @@ export default function RoleDialog({ serverId, role, onSaved, onClose }: RoleDia
   );
 
   return (
-    <Modal title={role ? `Editar role: ${role.name}` : 'Nova role'} onClose={onClose}>
+    <Modal title={role ? t('dialog.role.title_edit', { name: role.name }) : t('dialog.role.title_new')} onClose={onClose}>
       <div className="form">
         <div className="form-row">
-          <label>Nome</label>
+          <label>{t('dialog.role.name')}</label>
           <input value={form.name} onChange={set('name')} disabled={!!role} autoFocus />
         </div>
         <div className="form-row">
-          <label>Senha</label>
-          <input type="password" value={form.password} onChange={set('password')} placeholder="Deixe em branco para manter" />
+          <label>{t('dialog.role.password')}</label>
+          <input type="password" value={form.password} onChange={set('password')} placeholder={t('dialog.role.password_hint')} />
         </div>
         <div className="form-row">
-          <label>Limite de conexões</label>
+          <label>{t('dialog.role.conn_limit')}</label>
           <input type="number" value={form.conn_limit} onChange={set('conn_limit')} />
         </div>
         <div className="form-row check-group">
-          {toggle('can_login', 'Pode logar')}
-          {toggle('superuser', 'Superuser')}
-          {toggle('create_db', 'Criar banco')}
-          {toggle('replication', 'Replicação')}
+          {toggle('can_login', t('dialog.role.can_login'))}
+          {toggle('superuser', t('dialog.role.superuser'))}
+          {toggle('create_db', t('dialog.role.create_db'))}
+          {toggle('replication', t('dialog.role.replication'))}
         </div>
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose} title="Cancelar"><Fa name="cancel" /> Cancelar</button>
-          <button className="btn primary" disabled={busy} onClick={submit} title="Salvar role">
-            {busy ? 'Salvando...' : <><Fa name="save" /> Salvar</>}
+          <button className="btn" onClick={onClose} title={t('dialog.cancel.button')}><Fa name="cancel" /> {t('dialog.cancel.button')}</button>
+          <button className="btn primary" disabled={busy} onClick={submit} title={t('dialog.role.save')}>
+            {busy ? t('dialog.role.saving') : <><Fa name="save" /> {t('dialog.role.save')}</>}
           </button>
         </div>
       </div>

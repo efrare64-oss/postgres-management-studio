@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { api } from '../../api';
 
@@ -15,6 +16,7 @@ interface GrantDialogProps {
 }
 
 export default function GrantDialog({ serverId, database, objectKind: initialKind, objectName: initialName, schema, onSaved, onClose }: GrantDialogProps) {
+  const { t } = useTranslation();
   const [roles, setRoles] = useState<{ name: string }[]>([]);
   const [objectKind, setObjectKind] = useState(initialKind || 'table');
   const [objectName, setObjectName] = useState(initialName || '');
@@ -39,8 +41,8 @@ export default function GrantDialog({ serverId, database, objectKind: initialKin
 
   const submit = async () => {
     setError(null);
-    if (selectedRoles.length === 0) { setError('Selecione ao menos um role.'); return; }
-    if (selectedPrivs.length === 0) { setError('Selecione ao menos um privilégio.'); return; }
+    if (selectedRoles.length === 0) { setError(t('dialog.grants.required_role')); return; }
+    if (selectedPrivs.length === 0) { setError(t('dialog.grants.required_priv')); return; }
     setBusy(true);
     try {
       await api.applyGrants(serverId, database, {
@@ -63,10 +65,10 @@ export default function GrantDialog({ serverId, database, objectKind: initialKin
   const needsObjectName = !['schema', 'database', 'tablespace', 'all_tables', 'all_sequences', 'all_functions'].includes(objectKind);
 
   return (
-    <Modal title="Conceder Privilégios" onClose={onClose} width={620}>
+    <Modal title={t('dialog.grants.title')} onClose={onClose} width={620}>
       <div className="form">
         <div className="form-row">
-          <label>Tipo de objeto</label>
+          <label>{t('dialog.grants.object_type')}</label>
           <select value={objectKind} onChange={(e) => setObjectKind(e.target.value)}>
             <option value="table">Table</option>
             <option value="schema">Schema</option>
@@ -78,12 +80,12 @@ export default function GrantDialog({ serverId, database, objectKind: initialKin
             <option value="all_functions">All Functions (schema)</option>
           </select>
         </div>
-        <div className="form-row"><label>Schema</label><input value={schemaName} onChange={(e) => setSchemaName(e.target.value)} /></div>
+        <div className="form-row"><label>{t('dialog.grants.schema')}</label><input value={schemaName} onChange={(e) => setSchemaName(e.target.value)} /></div>
         {needsObjectName && (
-          <div className="form-row"><label>Objeto</label><input value={objectName} onChange={(e) => setObjectName(e.target.value)} autoFocus /></div>
+          <div className="form-row"><label>{t('dialog.grants.object')}</label><input value={objectName} onChange={(e) => setObjectName(e.target.value)} autoFocus /></div>
         )}
 
-        <h4 className="section-title">Privilégios</h4>
+        <h4 className="section-title">{t('dialog.grants.privileges')}</h4>
         <div className="flex flex-wrap gap-2">
           {PRIVILEGES.map((p) => (
             <label key={p} className="inline-flex items-center gap-1 text-[13px]">
@@ -92,7 +94,7 @@ export default function GrantDialog({ serverId, database, objectKind: initialKin
           ))}
         </div>
 
-        <h4 className="section-title">Roles</h4>
+        <h4 className="section-title">{t('dialog.grants.roles')}</h4>
         <div className="flex flex-wrap gap-2">
           {roles.map((r) => (
             <label key={r.name} className="inline-flex items-center gap-1 text-[13px]">
@@ -107,8 +109,8 @@ export default function GrantDialog({ serverId, database, objectKind: initialKin
 
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn primary" disabled={busy} onClick={submit}>{busy ? 'Aplicando...' : 'Conceder'}</button>
+          <button className="btn" onClick={onClose}>{t('dialog.cancel.button')}</button>
+          <button className="btn primary" disabled={busy} onClick={submit}>{busy ? t('dialog.grants.applying') : t('dialog.grants.apply')}</button>
         </div>
       </div>
     </Modal>

@@ -1,4 +1,5 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from './api';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Header from './components/Header';
@@ -75,6 +76,7 @@ const OPENABLE = [
 ];
 
 export default function App() {
+  const { t } = useTranslation();
   const [servers, setServers] = useState<StudioServer[]>([]);
   const [groups, setGroups] = useState<ServerGroup[]>([]);
   const [tabs, setTabs] = useState<AppTab[]>([]);
@@ -246,7 +248,7 @@ export default function App() {
   const openQueryTool = (opts?: { initialQuery?: string; title?: string }) => {
     const base = activeQueryTab?.context ?? context;
     const ctx: QueryContext = { serverId: base?.serverId ?? servers[0]?.id ?? null, database: base?.database ?? null };
-    openTab({ id: `query:${tabSeq++}`, title: opts?.title || 'Query Tool', kind: 'query', context: ctx, ...(opts?.initialQuery ? { initialQuery: opts.initialQuery } : {}) });
+    openTab({ id: `query:${tabSeq++}`, title: opts?.title || t('tab.query_tool'), kind: 'query', context: ctx, ...(opts?.initialQuery ? { initialQuery: opts.initialQuery } : {}) });
   };
 
   const handleTabClose = (id: string) => {
@@ -319,18 +321,18 @@ export default function App() {
       case 'delete-server':
         if (serverId != null) {
           setModal({
-            type: 'confirm', title: 'Deletar servidor', danger: true,
-            message: `Deseja realmente deletar o servidor "${name}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_server'), danger: true,
+            message: t('confirm.delete_server_msg', { name }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.deleteServer(serverId); refresh(); },
           });
         }
         break;
       case 'delete-group':
         setModal({
-          type: 'confirm', title: 'Deletar grupo', danger: true,
-          message: `Deseja realmente deletar o grupo "${name}"?`,
-          confirmLabel: 'Deletar',
+          type: 'confirm', title: t('confirm.delete_group'), danger: true,
+          message: t('confirm.delete_group_msg', { name }),
+          confirmLabel: t('confirm.delete'),
           onConfirm: async () => {
             const g = groups.find((x) => x.name === name);
             if (g) await api.deleteGroup(g.id);
@@ -360,9 +362,9 @@ export default function App() {
       case 'drop-database':
         if (serverId != null && database) {
           setModal({
-            type: 'confirm', title: 'Deletar database', danger: true,
-            message: `Deseja realmente deletar o database "${database}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_database'), danger: true,
+            message: t('confirm.delete_database_msg', { name: database }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.dropDatabase(serverId, database, true); refresh(); },
           });
         }
@@ -373,9 +375,9 @@ export default function App() {
       case 'drop-schema':
         if (serverId != null && database && schema) {
           setModal({
-            type: 'confirm', title: 'Deletar schema', danger: true,
-            message: `Deseja realmente deletar o schema "${schema}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_schema'), danger: true,
+            message: t('confirm.delete_schema_msg', { name: schema }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.dropSchema(serverId, database, schema, true); refresh(); },
           });
         }
@@ -394,9 +396,9 @@ export default function App() {
       case 'drop-table':
         if (serverId != null && database && schema && name) {
           setModal({
-            type: 'confirm', title: 'Deletar tabela', danger: true,
-            message: `Deseja realmente deletar a tabela "${schema}.${name}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_table'), danger: true,
+            message: t('confirm.delete_table_msg', { name: `${schema}.${name}` }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.delete<void>(`/servers/${serverId}/databases/${encodeURIComponent(database)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(name)}`); refresh(); },
           });
         }
@@ -413,8 +415,8 @@ export default function App() {
         break;
       case 'reindex-index':
         if (serverId != null && database && schema && name) {
-          setStatus(`REINDEX em ${schema}.${name}...`);
-          api.reindexIndex(serverId, database, schema, name).then(() => setStatus('REINDEX concluído')).catch((e) => setStatus(e.message));
+          setStatus(t('status.reindexing', { name: `${schema}.${name}` }));
+          api.reindexIndex(serverId, database, schema, name).then(() => setStatus(t('status.reindex_done'))).catch((e) => setStatus(e.message));
         }
         break;
       case 'add-partition':
@@ -426,46 +428,46 @@ export default function App() {
       case 'detach-partition':
         if (serverId != null && database && schema && name && table) {
           setModal({
-            type: 'confirm', title: 'Desanexar partição', danger: true,
-            message: `Deseja realmente desanexar a partição "${name}" da tabela "${schema}.${table}"?`,
-            confirmLabel: 'Detach',
+            type: 'confirm', title: t('confirm.detach_partition'), danger: true,
+            message: t('confirm.detach_partition_msg', { name, table: `${schema}.${table}` }),
+            confirmLabel: t('confirm.detach'),
             onConfirm: async () => { await api.detachPartition(serverId, database, schema, table, name); refresh(); },
           });
         }
         break;
       case 'reindex':
         if (serverId != null && database && schema && name) {
-          setStatus(`REINDEX em ${schema}.${name}...`);
-          api.reindexTable(serverId, database, schema, name).then(() => setStatus('REINDEX concluído')).catch((e) => setStatus(e.message));
+          setStatus(t('status.reindexing', { name: `${schema}.${name}` }));
+          api.reindexTable(serverId, database, schema, name).then(() => setStatus(t('status.reindex_done'))).catch((e) => setStatus(e.message));
         }
         break;
       case 'analyze-table':
         if (serverId != null && database && schema && name) {
-          setStatus(`ANALYZE em ${schema}.${name}...`);
-          api.analyzeTable(serverId, database, schema, name).then(() => setStatus('ANALYZE concluído')).catch((e) => setStatus(e.message));
+          setStatus(t('status.analyzing', { name: `${schema}.${name}` }));
+          api.analyzeTable(serverId, database, schema, name).then(() => setStatus(t('status.analyze_done'))).catch((e) => setStatus(e.message));
         }
         break;
       case 'analyze-database':
         if (serverId != null && database) {
-          setStatus(`ANALYZE no banco ${database}...`);
-          api.analyzeDatabase(serverId, database).then(() => setStatus('ANALYZE no banco concluído')).catch((e) => setStatus(e.message));
+          setStatus(t('status.analyzing_db', { name: database }));
+          api.analyzeDatabase(serverId, database).then(() => setStatus(t('status.analyze_db_done'))).catch((e) => setStatus(e.message));
         }
         break;
       case 'count-rows':
         if (serverId != null && database && schema && name) {
-          api.countTableRows(serverId, database, schema, name).then((r) => setStatus(`Linhas em ${schema}.${name}: ${r.count}`)).catch((e) => setStatus(e.message));
+          api.countTableRows(serverId, database, schema, name).then((r) => setStatus(t('status.row_count', { name: `${schema}.${name}`, count: r.count }))).catch((e) => setStatus(e.message));
         }
         break;
       case 'refresh-matview':
         if (serverId != null && database && schema && name) {
-          api.refreshMatView(serverId, database, schema, name, true).then(() => setStatus(`Matview ${name} atualizada`)).catch((e) => setStatus(e.message));
+          api.refreshMatView(serverId, database, schema, name, true).then(() => setStatus(t('status.matview_refreshed', { name }))).catch((e) => setStatus(e.message));
         }
         break;
       case 'create-view': {
         if (serverId == null || !database) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New View',
+          title: t('tab.new_view'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: viewTemplate(schema || 'public'),
@@ -476,7 +478,7 @@ export default function App() {
         if (serverId == null || !database) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Materialized View',
+          title: t('tab.new_matview'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: viewTemplate(schema || 'public', true),
@@ -500,7 +502,7 @@ export default function App() {
         if (serverId == null || !database) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Sequence',
+          title: t('tab.new_sequence'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: sequenceTemplate(schema || 'public'),
@@ -524,7 +526,7 @@ export default function App() {
         if (serverId == null || !database) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Function',
+          title: t('tab.new_function'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: functionTemplate(schema || 'public'),
@@ -535,7 +537,7 @@ export default function App() {
         if (serverId == null || !database) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Procedure',
+          title: t('tab.new_procedure'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: procedureTemplate(schema || 'public'),
@@ -559,7 +561,7 @@ export default function App() {
         if (serverId == null || !database) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Trigger Function',
+          title: t('tab.new_trigger_function'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: functionTemplate(schema || 'public', 'trigger'),
@@ -583,7 +585,7 @@ export default function App() {
         if (serverId == null || !database || !name) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Index',
+          title: t('tab.new_index'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: indexTemplate(schema || 'public', name),
@@ -607,7 +609,7 @@ export default function App() {
         if (serverId == null || !database || !table) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Column',
+          title: t('tab.new_column'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: columnTemplate(schema || 'public', table),
@@ -630,9 +632,9 @@ export default function App() {
       case 'drop-column':
         if (serverId != null && database && schema && name && table) {
           setModal({
-            type: 'confirm', title: 'Deletar coluna', danger: true,
-            message: `Deseja realmente deletar a coluna "${name}" da tabela "${schema}.${table}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_column'), danger: true,
+            message: t('confirm.delete_column_msg', { name, table: `${schema}.${table}` }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.dropColumn(serverId, database, schema, table, name, true); refresh(); },
           });
         }
@@ -641,7 +643,7 @@ export default function App() {
         if (serverId == null || !database || !table) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Constraint',
+          title: t('tab.new_constraint'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: constraintTemplate(schema || 'public', table),
@@ -664,9 +666,9 @@ export default function App() {
       case 'drop-constraint':
         if (serverId != null && database && schema && name && table) {
           setModal({
-            type: 'confirm', title: 'Deletar constraint', danger: true,
-            message: `Deseja realmente deletar a constraint "${name}" da tabela "${schema}.${table}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_constraint'), danger: true,
+            message: t('confirm.delete_constraint_msg', { name, table: `${schema}.${table}` }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.dropConstraint(serverId, database, schema, table, name, true); refresh(); },
           });
         }
@@ -675,7 +677,7 @@ export default function App() {
         if (serverId == null || !database || !table) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Trigger',
+          title: t('tab.new_trigger'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: triggerTemplate(schema || 'public', table),
@@ -698,28 +700,28 @@ export default function App() {
       case 'drop-trigger':
         if (serverId != null && database && schema && name && table) {
           setModal({
-            type: 'confirm', title: 'Deletar trigger', danger: true,
-            message: `Deseja realmente deletar o trigger "${name}" da tabela "${schema}.${table}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_trigger'), danger: true,
+            message: t('confirm.delete_trigger_msg', { name, table: `${schema}.${table}` }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.dropTrigger(serverId, database, schema, table, name); refresh(); },
           });
         }
         break;
       case 'enable-trigger':
         if (serverId != null && database && schema && name && table) {
-          api.enableTrigger(serverId, database, schema, table, name).then(() => setStatus(`Trigger ${name} habilitado`)).catch((e) => setStatus(e.message));
+          api.enableTrigger(serverId, database, schema, table, name).then(() => setStatus(t('status.trigger_enabled', { name }))).catch((e) => setStatus(e.message));
         }
         break;
       case 'disable-trigger':
         if (serverId != null && database && schema && name && table) {
-          api.disableTrigger(serverId, database, schema, table, name).then(() => setStatus(`Trigger ${name} desabilitado`)).catch((e) => setStatus(e.message));
+          api.disableTrigger(serverId, database, schema, table, name).then(() => setStatus(t('status.trigger_disabled', { name }))).catch((e) => setStatus(e.message));
         }
         break;
       case 'create-policy': {
         if (serverId == null || !database || !table) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Policy',
+          title: t('tab.new_policy'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: policyTemplate(schema || 'public', table),
@@ -742,9 +744,9 @@ export default function App() {
       case 'drop-policy':
         if (serverId != null && database && schema && name && table) {
           setModal({
-            type: 'confirm', title: 'Deletar policy', danger: true,
-            message: `Deseja realmente deletar a policy "${name}" da tabela "${schema}.${table}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_policy'), danger: true,
+            message: t('confirm.delete_policy_msg', { name, table: `${schema}.${table}` }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.dropPolicy(serverId, database, schema, table, name); refresh(); },
           });
         }
@@ -753,7 +755,7 @@ export default function App() {
         if (serverId == null || !database || !table) break;
         openTab({
           id: `query:${tabSeq++}`,
-          title: 'New Rule',
+          title: t('tab.new_rule'),
           kind: 'query',
           context: { serverId, database },
           initialQuery: ruleTemplate(schema || 'public', table),
@@ -776,9 +778,9 @@ export default function App() {
       case 'drop-rule':
         if (serverId != null && database && schema && name && table) {
           setModal({
-            type: 'confirm', title: 'Deletar rule', danger: true,
-            message: `Deseja realmente deletar a rule "${name}" da tabela "${schema}.${table}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_rule'), danger: true,
+            message: t('confirm.delete_rule_msg', { name, table: `${schema}.${table}` }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.dropRule(serverId, database, schema, table, name); refresh(); },
           });
         }
@@ -789,9 +791,9 @@ export default function App() {
       case 'drop-procedure':
         if (serverId != null && database && name) {
           setModal({
-            type: 'confirm', title: 'Deletar procedure', danger: true,
-            message: `Deseja realmente deletar a procedure "${schema ? schema + '.' : ''}${name}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_procedure'), danger: true,
+            message: t('confirm.delete_procedure_msg', { name: `${schema ? schema + '.' : ''}${name}` }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.dropProcedure(serverId, database, schema || 'public', name); refresh(); },
           });
         }
@@ -804,9 +806,9 @@ export default function App() {
       case 'drop-extension':
         if (serverId != null && database && name) {
           setModal({
-            type: 'confirm', title: 'Deletar objeto', danger: true,
-            message: `Deseja realmente deletar "${schema ? schema + '.' : ''}${name}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_object'), danger: true,
+            message: t('confirm.delete_object_msg', { name: `${schema ? schema + '.' : ''}${name}` }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => {
               const kinds: Record<string, string> = { 'drop-view': 'view', 'drop-matview': 'matview', 'drop-sequence': 'sequence', 'drop-function': 'function', 'drop-index': 'index', 'drop-extension': 'extension' };
               const kind = kinds[action.kind];
@@ -827,9 +829,9 @@ export default function App() {
       case 'drop-role':
         if (serverId != null && name) {
           setModal({
-            type: 'confirm', title: 'Deletar role', danger: true,
-            message: `Deseja realmente deletar o role "${name}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_role'), danger: true,
+            message: t('confirm.delete_role_msg', { name }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => { await api.dropRole(serverId, name); refresh(); },
           });
         }
@@ -865,9 +867,9 @@ export default function App() {
       case 'drop-catalog-object':
         if (serverId != null && name) {
           setModal({
-            type: 'confirm', title: `Deletar ${nodeType || 'objeto'}`, danger: true,
-            message: `Deseja realmente deletar "${name}"?`,
-            confirmLabel: 'Deletar',
+            type: 'confirm', title: t('confirm.delete_object'), danger: true,
+            message: t('confirm.delete_object_msg', { name }),
+            confirmLabel: t('confirm.delete'),
             onConfirm: async () => {
               if (nodeType === 'tablespace') {
                 await api.delete<void>(`/servers/${serverId}/tablespaces/${encodeURIComponent(name)}`);
@@ -927,7 +929,7 @@ export default function App() {
     try {
       await api.importServers(file);
       await loadData();
-      setStatus('Servidores importados com sucesso.');
+      setStatus(t('status.imported'));
     } catch (err) {
       setStatus((err as Error).message);
     }
@@ -943,67 +945,67 @@ export default function App() {
   const menuItems: MenuDef[] = useMemo(() => [
     {
       id: 'file',
-      label: 'File',
+      label: t('menu.file'),
       items: [
-        { label: 'New Server...', icon: 'server', onClick: () => setModal({ type: 'connect' }) },
-        { label: 'New Server Group...', icon: 'group', onClick: () => setModal({ type: 'group' }) },
+        { label: t('menu.new_server'), icon: 'server', onClick: () => setModal({ type: 'connect' }) },
+        { label: t('menu.new_group'), icon: 'group', onClick: () => setModal({ type: 'group' }) },
         { sep: true },
-        { label: 'Export Servers...', icon: 'download', onClick: exportServers },
-        { label: 'Import Servers...', icon: 'upload', onClick: () => importInputRef.current?.click() },
+        { label: t('menu.export'), icon: 'download', onClick: exportServers },
+        { label: t('menu.import'), icon: 'upload', onClick: () => importInputRef.current?.click() },
         { sep: true },
-        { label: 'Exit', icon: 'close', onClick: () => window.close() },
+        { label: t('menu.exit'), icon: 'close', onClick: () => window.close() },
       ],
     },
     {
       id: 'object',
-      label: 'Object',
+      label: t('menu.object'),
       items: [
-        { label: 'New Table...', icon: 'table', enabled: !!context.serverId && !!context.database, onClick: () => context.serverId && context.database && setModal({ type: 'table' }) },
-        { label: 'New Role...', icon: 'role', enabled: !!context.serverId, onClick: () => context.serverId && setModal({ type: 'role' }) },
-        { label: 'Edit Server...', icon: 'edit', enabled: !!context.serverId, onClick: () => { const s = servers.find((x) => x.id === context.serverId); if (s) setModal({ type: 'connect', server: s }); } },
+        { label: t('menu.new_table'), icon: 'table', enabled: !!context.serverId && !!context.database, onClick: () => context.serverId && context.database && setModal({ type: 'table' }) },
+        { label: t('menu.new_role'), icon: 'role', enabled: !!context.serverId, onClick: () => context.serverId && setModal({ type: 'role' }) },
+        { label: t('menu.edit_server'), icon: 'edit', enabled: !!context.serverId, onClick: () => { const s = servers.find((x) => x.id === context.serverId); if (s) setModal({ type: 'connect', server: s }); } },
         { sep: true },
-        { label: 'Refresh', icon: 'refresh', onClick: loadData },
+        { label: t('menu.refresh'), icon: 'refresh', onClick: loadData },
       ],
     },
     {
       id: 'tools',
-      label: 'Tools',
+      label: t('menu.tools'),
       items: [
-        { label: 'Query Tool', icon: 'sql', onClick: openQueryTool },
+        { label: t('menu.query_tool'), icon: 'sql', onClick: openQueryTool },
         { sep: true },
-        { label: 'Server Dashboard', icon: 'chart', enabled: !!context.serverId, onClick: () => openDashboard('server') },
-        { label: 'Database Dashboard', icon: 'chart', enabled: !!context.serverId && !!context.database, onClick: () => openDashboard('database') },
+        { label: t('menu.server_dashboard'), icon: 'chart', enabled: !!context.serverId, onClick: () => openDashboard('server') },
+        { label: t('menu.database_dashboard'), icon: 'chart', enabled: !!context.serverId && !!context.database, onClick: () => openDashboard('database') },
       ],
     },
     {
       id: 'help',
-      label: 'Help',
+      label: t('menu.help'),
       items: [
-        { label: 'About', icon: 'info', onClick: () => setModal({ type: 'about' }) },
+        { label: t('menu.about'), icon: 'info', onClick: () => setModal({ type: 'about' }) },
       ],
     },
   ], [context, servers, loadData, activeQueryTab]);
 
   const toolbar: ToolbarItem[] = useMemo(() => [
-    { key: 'new-server', icon: 'server', label: 'New Server', onClick: () => setModal({ type: 'connect' }) },
-    { key: 'new-group', icon: 'group', label: 'New Group', onClick: () => setModal({ type: 'group' }) },
-    { key: 'new-table', icon: 'table', label: 'New Table', enabled: !!context.serverId && !!context.database, onClick: () => context.serverId && context.database && setModal({ type: 'table' }) },
-    { key: 'new-role', icon: 'role', label: 'New Role', enabled: !!context.serverId, onClick: () => context.serverId && setModal({ type: 'role' }) },
+    { key: 'new-server', icon: 'server', label: t('toolbar.new_server'), onClick: () => setModal({ type: 'connect' }) },
+    { key: 'new-group', icon: 'group', label: t('toolbar.new_group'), onClick: () => setModal({ type: 'group' }) },
+    { key: 'new-table', icon: 'table', label: t('toolbar.new_table'), enabled: !!context.serverId && !!context.database, onClick: () => context.serverId && context.database && setModal({ type: 'table' }) },
+    { key: 'new-role', icon: 'role', label: t('toolbar.new_role'), enabled: !!context.serverId, onClick: () => context.serverId && setModal({ type: 'role' }) },
     { key: 'sep1', sep: true },
-    { key: 'query', icon: 'sql', label: 'Query Tool', onClick: openQueryTool },
-    { key: 'refresh', icon: 'refresh', label: 'Refresh', onClick: loadData },
+    { key: 'query', icon: 'sql', label: t('toolbar.query_tool'), onClick: openQueryTool },
+    { key: 'refresh', icon: 'refresh', label: t('toolbar.refresh'), onClick: loadData },
   ], [context, loadData, activeQueryTab]);
 
   const statusText = status || (
     context.serverId
-      ? `Servidor: ${selectedServerName() || context.serverId}${context.database ? ` • Banco: ${context.database}` : ''}${context.schema ? ` • Schema: ${context.schema}` : ''}`
-      : 'Nenhum servidor selecionado'
+      ? `${t('status.server')} ${selectedServerName() || context.serverId}${context.database ? ` • ${t('status.database')} ${context.database}` : ''}${context.schema ? ` • ${t('status.schema')} ${context.schema}` : ''}`
+      : t('status.no_server')
   );
 
   return (
     <ThemeProvider>
     <div className="flex h-screen flex-col">
-      <Header version="v0.3.0" />
+      <Header version="v0.4.0" />
       <MenuBar items={menuItems} openMenu={openMenu} onOpenMenu={setOpenMenu} />
       <Toolbar items={toolbar} />
 
@@ -1022,7 +1024,7 @@ export default function App() {
           <button
             className="flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 border-t border-border bg-[#f4f6f8] px-2 text-muted hover:text-text"
             onClick={() => doSearch()}
-            title="Buscar objetos na aba em foco"
+            title={t('app.search_hint')}
           >
             <Fa name="search" />
           </button>
@@ -1030,7 +1032,7 @@ export default function App() {
         <div
           className={`w-[5px] shrink-0 cursor-col-resize border-r border-border bg-panel-bg ${resizing ? 'bg-pg-blue' : 'hover:bg-pg-blue'}`}
           onMouseDown={() => setResizing(true)}
-          title="Arraste para redimensionar"
+          title={t('app.resize_hint')}
         />
 
         <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-pg-bg">
@@ -1106,7 +1108,7 @@ export default function App() {
         </section>
       </div>
 
-      <StatusBar text={statusText} error={!!status} right={`${servers.length} servidor(es)`} />
+      <StatusBar text={statusText} error={!!status} right={`${servers.length} ${t('status.servers')}`} />
 
       {modal?.type === 'connect' && (
         <ConnectDialog server={modal.server} groupId={modal.groupId ?? null} groups={groups} onSaved={() => { loadData(); }} onClose={() => setModal(null)} />
@@ -1145,7 +1147,7 @@ export default function App() {
         <ExtensionDialog serverId={modal.serverId} database={modal.database} onSaved={refreshSelfFromLastAction} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'grants' && (
-        <GrantDialog serverId={modal.serverId} database={modal.database} objectKind={modal.objectKind} objectName={modal.objectName} schema={modal.schema} onSaved={() => { setStatus('Privilégios aplicados'); }} onClose={() => setModal(null)} />
+        <GrantDialog serverId={modal.serverId} database={modal.database} objectKind={modal.objectKind} objectName={modal.objectName} schema={modal.schema} onSaved={() => { setStatus(t('status.grants_applied')); }} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'backup' && (
         <BackupDialog serverId={modal.serverId} database={modal.database} table={modal.table} onClose={() => setModal(null)} />

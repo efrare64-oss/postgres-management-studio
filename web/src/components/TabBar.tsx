@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Fa } from '../icons';
 import type { AppTab } from '../types';
 
@@ -20,6 +21,7 @@ function kindIcon(kind: string, node?: AppTab['node']) {
 }
 
 export default function TabBar({ tabs, activeTab, onSelect, onClose }: TabBarProps) {
+  const { t } = useTranslation();
   const [widths, setWidths] = useState<Record<string, number>>({});
   const drag = useRef<{ id: string; startX: number; startW: number } | null>(null);
 
@@ -43,31 +45,31 @@ export default function TabBar({ tabs, activeTab, onSelect, onClose }: TabBarPro
 
   return (
     <div className="flex shrink-0 items-end gap-[3px] overflow-x-auto border-b border-border bg-tab-bg px-1 pt-1">
-      {tabs.map((t) => (
+      {tabs.map((tab) => (
         <div
-          key={t.id}
-          className={`flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-t-md border border-border px-2 text-[#4a5560] ${
-            activeTab === t.id ? 'border-b-panel-bg bg-panel-bg text-[#1f2937]' : 'bg-tab-bg hover:bg-[#d7dbe1]'
+          key={tab.id}
+          className={`flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-t-md border border-border px-2 text-muted ${
+            activeTab === tab.id ? 'border-b-panel-bg bg-panel-bg text-text' : 'bg-tab-bg hover:bg-[#d7dbe1]'
           }`}
-          style={{ width: widths[t.id] ?? 180 }}
-          onClick={() => onSelect(t.id)}
+          style={{ width: widths[tab.id] ?? 180 }}
+          onClick={() => onSelect(tab.id)}
         >
-          <span className="text-xs text-pg-blue"><Fa name={kindIcon(t.kind, t.node)} /></span>
-          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis pl-0.5 pr-1">{t.title}</span>
+          <span className="text-xs text-pg-blue"><Fa name={kindIcon(tab.kind, tab.node)} /></span>
+          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis pl-0.5 pr-1">{tab.title}</span>
           <button
             className="inline-flex cursor-pointer border-none bg-transparent p-0 text-muted hover:text-danger"
-            onClick={(e) => { e.stopPropagation(); onClose(t.id); }}
-            title="Fechar"
+            onClick={(e) => { e.stopPropagation(); onClose(tab.id); }}
+            title={t('tabbar.close')}
           >
             <Fa name="close" />
           </button>
           <span
             className="mr-[-7px] h-full w-[5px] cursor-col-resize select-none"
-            title="Arraste para redimensionar"
+            title={t('tabbar.resize')}
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              drag.current = { id: t.id, startX: e.clientX, startW: widths[t.id] ?? 180 };
+              drag.current = { id: tab.id, startX: e.clientX, startW: widths[tab.id] ?? 180 };
             }}
           />
         </div>

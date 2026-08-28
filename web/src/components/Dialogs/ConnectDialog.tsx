@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { api } from '../../api';
 import type { ServerGroup, StudioServer } from '../../types';
@@ -28,6 +29,7 @@ interface ConnectDialogProps {
 }
 
 export default function ConnectDialog({ server, groupId, groups, onSaved, onClose }: ConnectDialogProps) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<ConnectForm>(() =>
     (server
       ? { ...EMPTY, ...server, password: server.password || '', server_group_id: server.server_group_id ?? '' }
@@ -72,7 +74,7 @@ export default function ConnectDialog({ server, groupId, groups, onSaved, onClos
     setTestBusy(true);
     try {
       await api.testServer(buildPayload());
-      setTestMessage('Conexão bem-sucedida.');
+      setTestMessage(t('dialog.connect.success'));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -81,14 +83,14 @@ export default function ConnectDialog({ server, groupId, groups, onSaved, onClos
   };
 
   return (
-    <Modal title={server ? 'Editar servidor' : 'Nova conexão'} onClose={onClose}>
+    <Modal title={server ? t('dialog.connect.title.edit') : t('dialog.connect.title.new')} onClose={onClose}>
       <div className="form">
         <div className="form-row">
-          <label>Nome</label>
-          <input value={form.name} onChange={set('name')} placeholder="Meu servidor" autoFocus />
+          <label>{t('dialog.connect.name')}</label>
+          <input value={form.name} onChange={set('name')} placeholder={t('dialog.connect.placeholder.name')} autoFocus />
         </div>
         <div className="form-row">
-          <label>Grupo</label>
+          <label>{t('dialog.connect.group')}</label>
           <select value={form.server_group_id} onChange={set('server_group_id')}>
             <option value="">Servers</option>
             {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -96,24 +98,24 @@ export default function ConnectDialog({ server, groupId, groups, onSaved, onClos
         </div>
         <div className="form-grid">
           <div className="form-row">
-            <label>Host</label>
+            <label>{t('dialog.connect.host')}</label>
             <input value={form.host} onChange={set('host')} />
           </div>
           <div className="form-row">
-            <label>Porta</label>
+            <label>{t('dialog.connect.port')}</label>
             <input type="number" value={form.port} onChange={set('port')} />
           </div>
         </div>
         <div className="form-row">
-          <label>Usuário</label>
+          <label>{t('dialog.connect.username')}</label>
           <input value={form.username} onChange={set('username')} />
         </div>
         <div className="form-row">
-          <label>Senha</label>
-          <input type="password" value={form.password} onChange={set('password')} placeholder="Deixe em branco para manter" />
+          <label>{t('dialog.connect.password')}</label>
+          <input type="password" value={form.password} onChange={set('password')} placeholder={t('dialog.connect.password_hint')} />
         </div>
         <div className="form-row">
-          <label>Banco</label>
+          <label>{t('dialog.connect.database')}</label>
           <input value={form.database} onChange={set('database')} />
         </div>
         <div className="form-row">
@@ -128,12 +130,12 @@ export default function ConnectDialog({ server, groupId, groups, onSaved, onClos
         {testMessage && <div className="form-success">{testMessage}</div>}
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn" onClick={onClose}>{t('dialog.cancel.button')}</button>
           <button className="btn" disabled={testBusy || busy || !form.name} onClick={testConnection}>
-            {testBusy ? 'Testando...' : 'Testar conexão'}
+            {testBusy ? t('dialog.connect.testing') : t('dialog.connect.test')}
           </button>
           <button className="btn primary" disabled={busy || !form.name} onClick={submit}>
-            {busy ? 'Salvando...' : 'Salvar'}
+            {busy ? t('dialog.connect.saving') : t('dialog.connect.save')}
           </button>
         </div>
       </div>

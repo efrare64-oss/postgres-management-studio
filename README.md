@@ -5,14 +5,14 @@
 **Gerenciador de servidores PostgreSQL com interface inspirada no pgAdmin 4.**
 **PostgreSQL server manager with a pgAdmin 4-inspired interface.**
 
-Versão 0.3.0 • Stack: Go, React + TypeScript + Vite
+Versão 0.4.0 • Stack: Go, React + TypeScript + Vite
 
 ![Go 1.27+](https://img.shields.io/badge/Go-1.27+-00ADD8)
 ![React 19+](https://img.shields.io/badge/React-19+-61DAFB)
 ![TypeScript 5+](https://img.shields.io/badge/TypeScript-5+-3178C6)
 ![Vite 8+](https://img.shields.io/badge/Vite-8+-646CFF)
 ![Tailwind CSS 4](https://img.shields.io/badge/Tailwind%20CSS-4-38BDF8)
-![Version v0.2.0](https://img.shields.io/badge/Version-v0.3.0-2b7489)
+![Version v0.4.0](https://img.shields.io/badge/Version-v0.4.0-2b7489)
 ![License MIT](https://img.shields.io/badge/License-MIT-007ec6)
 
 </div>
@@ -36,11 +36,18 @@ Versão 0.3.0 • Stack: Go, React + TypeScript + Vite
 - 🛡️ **Conexões seguras com gerenciamento de credenciais** / Secure connections with credential management
 - 📁 **Gerenciamento de arquivos SQL** / SQL file management (New/Open/Save/Save As)
 - 🌐 **Aplicação desktop nativa (WebView2) + servidor REST** / Native desktop app (WebView2) + REST server
+- 🌍 **Suporte a 11 idiomas com troca instantânea** / 11 languages support with instant switching
+  - Inglês, Português, Espanhol, Francês, Alemão, Italiano, Japonês, Coreano, Russo, Chinês Simplificado e Tradicional
+  - English, Portuguese, Spanish, French, German, Italian, Japanese, Korean, Russian, Simplified Chinese and Traditional Chinese
+  - Seletor de idioma no header para troca em tempo real / Language selector in header for real-time switching
+- 🎨 **Temas claro e escuro** / Light and dark themes
+  - UI profissional com suporte completo a temas / Professional UI with full theme support
+  - Cores consistentes em todos os componentes / Consistent colors across all components
 
 ## 🛠️ Stack Tecnológica / Tech Stack
 
 - **Backend:** Go, PostgreSQL Driver (pgx), REST API, SQLite (configuração local / local config)
-- **Frontend:** React 19+, TypeScript 5+, Vite 8, Tailwind CSS 4, CodeMirror
+- **Frontend:** React 19+, TypeScript 5+, Vite 8, Tailwind CSS 4, CodeMirror, i18next (internacionalização / internationalization)
 - **Desktop:** WebView2 (go-webview2) com janela nativa maximizada
 
 ## 📋 Pré-requisitos / Prerequisites
@@ -164,6 +171,8 @@ postgres-management-studio/
 - **Scripts por Objeto / Per-Object Scripts** — Menu "Scripts ▸ Create Script" gera o DDL de qualquer objeto / the "Scripts ▸ Create Script" menu generates the DDL of any object
 - **Visualização de Tabelas / Table View** — Veja propriedades, colunas, índices e estatísticas com seleção de linhas e cópia / view properties, columns, indexes and statistics with row selection and copy
 - **Dashboards** — Servidor e banco com sessões ativas e tamanhos / server and database dashboards with active sessions and sizes
+- **Multi-idioma / Multi-language** — Seletor de idioma no header com 11 idiomas disponíveis para troca instantânea / Language selector in header with 11 languages available for instant switching
+- **Temas** — Temas claro e escuro com cores consistentes em todos os componentes / Light and dark themes with consistent colors across all components
 
 ## 🤝 Contribuição / Contributing
 
@@ -197,10 +206,14 @@ Contributions are very welcome! Please follow these steps:
 - ✅ Criação/edição de objetos via Query Tool no estilo SSMS (procedures, functions, views, sequences, indexes, columns, constraints, triggers, policies, rules) / SSMS-style object creation & editing via Query Tool
 - ✅ DDL gerado do catálogo para edição e "Create Script" de cada objeto / Catalog-generated DDL for editing and per-object "Create Script"
 - ✅ Refresh por objeto preservando a expansão da árvore / Per-object refresh preserving tree expansion
+- ✅ Suporte a 11 idiomas (EN, PT, ES, FR, DE, IT, JA, KO, RU, ZH-Hans, ZH-Hant) / 11 languages support
+- ✅ Seletor de idioma no header com troca instantânea / Language selector in header with instant switching
+- ✅ Todos os componentes com suporte completo a i18n / All components with full i18n support
+- ✅ Tema claro/escuro com cores consistentes em todos os componentes / Light/dark theme with consistent colors across all components
 
 ## ⚠️ Problemas Conhecidos / Known Issues
 
-- Versão 0.3.0: Em desenvolvimento ativo / Version 0.3.0: under active development
+- Versão 0.4.0: Em desenvolvimento ativo / Version 0.4.0: under active development
 - Autocomplete no query executor ainda em beta / Query tool autocomplete is still in beta
 - Suporte limitado a roles e permissões / Limited support for roles and permissions
 

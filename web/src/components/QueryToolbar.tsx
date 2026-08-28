@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Fa } from '../icons';
 import type { StudioServer } from '../types';
 
@@ -50,41 +51,42 @@ export default function QueryToolbar({
   onSave,
   onSaveAs,
 }: QueryToolbarProps) {
+  const { t } = useTranslation();
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border-soft bg-[#f4f6f8] px-2.5 py-1.5">
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border-soft bg-menu-bg px-2.5 py-1.5">
       <div className="flex items-center gap-1.5">
-        <label className="text-xs text-muted">Servidor</label>
+        <label className="text-xs text-muted">{t('qt.server')}</label>
         <select value={serverId} onChange={(e) => onServerChange(e.target.value)} className="max-w-[180px] rounded border border-border px-1.5 py-1 font-sans text-[13px]">
-          <option value="">Selecione...</option>
+          <option value="">{t('qt.select')}</option>
           {servers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <label className="text-xs text-muted">Banco</label>
+        <label className="text-xs text-muted">{t('qt.database')}</label>
         <select
           value={database}
           onChange={(e) => onDatabaseChange(e.target.value)}
           className={`max-w-[180px] rounded border border-border px-1.5 py-1 font-sans text-[13px] ${loading ? 'opacity-60' : ''}`}
         >
           {!databases.some((d) => d.name === database) && (
-            <option value={database}>{loading ? 'Carregando...' : database || 'Selecione...'}</option>
+            <option value={database}>{loading ? t('qt.loading') : database || t('qt.select')}</option>
           )}
           {databases.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
         </select>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        <button className="btn" onClick={onNew} title="Novo (Ctrl+N)">
+        <button className="btn" onClick={onNew} title={t('qt.new')}>
           <Fa name="plus" />
         </button>
-        <button className="btn" onClick={onOpen} title="Abrir arquivo SQL (Ctrl+O)">
+        <button className="btn" onClick={onOpen} title={t('qt.open')}>
           <Fa name="upload" />
         </button>
-        <button className="btn" onClick={onSave} title="Salvar (Ctrl+S)">
+        <button className="btn" onClick={onSave} title={t('qt.save')}>
           <Fa name="save" />
         </button>
-        <button className="btn" onClick={onSaveAs} title="Salvar como (Ctrl+Shift+S)">
+        <button className="btn" onClick={onSaveAs} title={t('qt.save_as')}>
           <Fa name="backup" />
         </button>
         <span className="mx-1 inline-block w-px self-stretch bg-border" />
-        <button className="btn primary" disabled={running} onClick={onExecute} title="Executar (F5)">
+        <button className="btn primary" disabled={running} onClick={onExecute} title={t('qt.execute')}>
           <Fa name="sql" />
         </button>
         <button className="btn" disabled={running} onClick={onExplain} title="EXPLAIN">
@@ -94,25 +96,25 @@ export default function QueryToolbar({
           <Fa name="explain-analyze" />
         </button>
         <span className="mx-1 inline-block w-px self-stretch bg-border" />
-        <button className="btn" onClick={onFormat} title="Formatar SQL">
+        <button className="btn" onClick={onFormat} title={t('qt.format')}>
           <Fa name="format" />
         </button>
-        <button className="btn" onClick={onGotoLine} title="Ir para linha">
+        <button className="btn" onClick={onGotoLine} title={t('qt.goto_line')}>
           <Fa name="goto" />
         </button>
-        <button className="btn" onClick={onToggleComment} title="Comentar/Descomentar">
+        <button className="btn" onClick={onToggleComment} title={t('qt.toggle_comment')}>
           <Fa name="comment" />
         </button>
-        <button className="btn" onClick={onUppercase} title="Maiúsculas">
+        <button className="btn" onClick={onUppercase} title={t('qt.uppercase')}>
           <Fa name="uppercase" />
         </button>
-        <button className="btn" onClick={onLowercase} title="Minúsculas">
+        <button className="btn" onClick={onLowercase} title={t('qt.lowercase')}>
           <Fa name="lowercase" />
         </button>
-        <button className="btn" onClick={onClear} title="Limpar">
+        <button className="btn" onClick={onClear} title={t('qt.clear')}>
           <Fa name="clear" />
         </button>
-        <button className="btn" onClick={onToggleHistory} title="Histórico">
+        <button className="btn" onClick={onToggleHistory} title={t('qt.history')}>
           <Fa name="history" />
         </button>
       </div>

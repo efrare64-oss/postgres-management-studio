@@ -27,14 +27,14 @@ export default function MenuBar({ items, openMenu, onOpenMenu }: MenuBarProps) {
       {items.map((m) => (
         <div key={m.id} className="relative">
           <button
-            className={`h-full px-4 text-sm leading-[30px] text-[#374151] ${openMenu === m.id ? 'bg-[#e2e6ec]' : ''} hover:bg-[#e2e6ec]`}
+            className={`h-full px-4 text-sm leading-[30px] text-text ${openMenu === m.id ? 'bg-[#e2e6ec]' : ''} hover:bg-[#e2e6ec]`}
             onClick={() => onOpenMenu(openMenu === m.id ? null : m.id)}
             onMouseEnter={() => openMenu && onOpenMenu(m.id)}
           >
             {m.label}
           </button>
           {openMenu === m.id && (
-            <div className="absolute top-full left-0 min-w-[220px] bg-white py-1 shadow-[0_4px_14px_rgba(0,0,0,0.16)] border border-menu-border">
+            <div className="absolute top-full left-0 min-w-[220px] bg-menu-bg py-1 shadow-[0_4px_14px_rgba(0,0,0,0.16)] border border-menu-border">
               {m.items.map((it, i) => renderItem(it, () => onOpenMenu(null)))}
             </div>
           )}

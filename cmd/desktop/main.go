@@ -220,7 +220,7 @@ func splashHTML(baseURL, fundo string) string {
       <img src="` + logoURL + `" width="132" height="132" alt="Postgres Management Studio"/>
     </div>
     <div class="title">Postgres Management Studio</div>
-    <div class="version">v0.3.0</div>
+    <div class="version">v0.4.0</div>
     <div class="bar"><div class="bar-fill"></div></div>
   </div>
 </body></html>`

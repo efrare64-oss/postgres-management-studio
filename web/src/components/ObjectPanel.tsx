@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import { Fa } from '../icons';
 import DataGrid from './DataGrid';
@@ -60,22 +61,23 @@ function useFetch<T>(fn: () => Promise<T>, deps: React.DependencyList): FetchSta
 }
 
 function ObjectTabs({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState('properties');
-  const tabs: { key: string; label: string }[] = [{ key: 'properties', label: 'Properties' }];
+  const tabs: { key: string; label: string }[] = [{ key: 'properties', label: t('obj.properties') }];
   if (node.type === 'table') {
-    tabs.push({ key: 'data', label: 'Data' });
-    tabs.push({ key: 'sql', label: 'SQL' });
-    tabs.push({ key: 'statistics', label: 'Statistics' });
-    tabs.push({ key: 'column-stats', label: 'Column Stats' });
-    tabs.push({ key: 'triggers', label: 'Triggers' });
-    tabs.push({ key: 'policies', label: 'Policies' });
-    tabs.push({ key: 'rules', label: 'Rules' });
+    tabs.push({ key: 'data', label: t('obj.data') });
+    tabs.push({ key: 'sql', label: t('obj.sql') });
+    tabs.push({ key: 'statistics', label: t('obj.statistics') });
+    tabs.push({ key: 'column-stats', label: t('obj.column_stats') });
+    tabs.push({ key: 'triggers', label: t('obj.triggers') });
+    tabs.push({ key: 'policies', label: t('obj.policies') });
+    tabs.push({ key: 'rules', label: t('obj.rules') });
   } else if (OBJECT_KINDS[node.type]) {
-    tabs.push({ key: 'sql', label: 'SQL' });
+    tabs.push({ key: 'sql', label: t('obj.sql') });
   }
   if (DEPENDABLE_KINDS.has(node.type)) {
-    tabs.push({ key: 'dependencies', label: 'Dependencies' });
-    tabs.push({ key: 'dependents', label: 'Dependents' });
+    tabs.push({ key: 'dependencies', label: t('obj.dependencies') });
+    tabs.push({ key: 'dependents', label: t('obj.dependents') });
   }
 
   return (
@@ -135,6 +137,7 @@ function PropertiesView({ node }: { node: TreeNode }) {
 }
 
 function TableProperties({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const { loading, data, error } = useFetch(
     () => api.tableDetail(node.serverId as number, node.database as string, node.schema as string, node.name as string),
     [node.key],
@@ -144,7 +147,7 @@ function TableProperties({ node }: { node: TreeNode }) {
     [node.key],
   );
 
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
   if (!data) return null;
 
@@ -171,7 +174,7 @@ function TableProperties({ node }: { node: TreeNode }) {
         last_vacuum: stats.data?.last_vacuum || '-',
         last_auto_vacuum: stats.data?.last_auto_vacuum || '-',
       })}
-      <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Columns</h4>
+      <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">{t('object.columns')}</h4>
       <DataTable
         headers={['#', 'Name', 'Type', 'Nullable', 'Default', 'PK', 'Width', 'Precision', 'Scale', 'Storage', 'Collation']}
         rows={data.columns.map((c) => [
@@ -179,7 +182,7 @@ function TableProperties({ node }: { node: TreeNode }) {
           c.width ?? '', c.precision ?? '', c.scale ?? '', c.storage, c.collation,
         ])}
       />
-      <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Indexes</h4>
+      <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">{t('object.indexes')}</h4>
       <DataTable
         headers={['Name', 'Columns', 'Unique', 'Method', 'Predicate', 'Tablespace', 'Fillfactor', 'Storage Params', 'Clustered']}
         rows={data.indexes.map((i) => [
@@ -187,7 +190,7 @@ function TableProperties({ node }: { node: TreeNode }) {
           i.tablespace, i.fillfactor, i.storage_params.join(', '), i.clustered ? 'yes' : 'no',
         ])}
       />
-      <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Constraints</h4>
+      <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">{t('object.constraints')}</h4>
       <DataTable
         headers={['Name', 'Type', 'Definition', 'Ref Table', 'Ref Columns', 'On Delete', 'On Update', 'Deferrable']}
         rows={data.constraints.map((c) => [
@@ -200,22 +203,24 @@ function TableProperties({ node }: { node: TreeNode }) {
 }
 
 function SqlView({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const kind = OBJECT_KINDS[node.type];
   const { loading, data, error } = useFetch(
     () => api.objectSql(node.serverId as number, node.database as string, node.schema as string, kind, node.name as string),
     [node.key],
   );
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
   return <pre className="overflow-auto whitespace-pre-wrap rounded border border-border-soft bg-[#f7f9fb] p-3 font-mono text-[13px] text-text">{data?.sql}</pre>;
 }
 
 function StatisticsView({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const { loading, data, error } = useFetch(
     () => api.tableStats(node.serverId as number, node.database as string, node.schema as string, node.name as string),
     [node.key],
   );
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
   if (!data) return null;
   return (
@@ -243,13 +248,14 @@ function StatisticsView({ node }: { node: TreeNode }) {
 }
 
 function ColumnStatsView({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const { loading, data, error } = useFetch(
     () => api.columnStats(node.serverId as number, node.database as string, node.schema as string, node.name as string),
     [node.key],
   );
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
-  if (!data || !data.length) return <div className="p-5 italic text-muted">Sem estatísticas (execute ANALYZE na tabela).</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">{t('obj.no_stats')}</div>;
   return (
     <DataTable
       headers={['Column', 'Null frac', 'Avg width', 'N distinct', 'Correlation', 'Most common values', 'Most common freqs', 'Histogram bounds']}
@@ -268,13 +274,14 @@ function ColumnStatsView({ node }: { node: TreeNode }) {
 }
 
 function TriggersView({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const { loading, data, error } = useFetch(
     () => api.triggers(node.serverId as number, node.database as string, node.schema as string, node.name as string),
     [node.key],
   );
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
-  if (!data || !data.length) return <div className="p-5 italic text-muted">Nenhum trigger.</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">{t('obj.no_triggers')}</div>;
   return (
     <DataTable
       headers={['Name', 'Table', 'Timing', 'Events', 'Function', 'Enabled', 'Definition']}
@@ -284,13 +291,14 @@ function TriggersView({ node }: { node: TreeNode }) {
 }
 
 function PoliciesView({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const { loading, data, error } = useFetch(
     () => api.policies(node.serverId as number, node.database as string, node.schema as string, node.name as string),
     [node.key],
   );
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
-  if (!data || !data.length) return <div className="p-5 italic text-muted">Nenhuma policy de row security.</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">{t('obj.no_policies')}</div>;
   return (
     <DataTable
       headers={['Name', 'Command', 'Permissive', 'Roles', 'Using', 'With Check']}
@@ -300,13 +308,14 @@ function PoliciesView({ node }: { node: TreeNode }) {
 }
 
 function RulesView({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const { loading, data, error } = useFetch(
     () => api.rules(node.serverId as number, node.database as string, node.schema as string, node.name as string),
     [node.key],
   );
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
-  if (!data || !data.length) return <div className="p-5 italic text-muted">Nenhuma rule.</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">{t('obj.no_rules')}</div>;
   return (
     <DataTable
       headers={['Name', 'Event', 'Instead', 'Where', 'Action']}
@@ -316,25 +325,26 @@ function RulesView({ node }: { node: TreeNode }) {
 }
 
 function ServerDashboard({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const { loading, data, error } = useFetch(
     () => api.serverDashboard(node.serverId as number),
     [node.key],
   );
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
   if (!data) return null;
 
   return (
     <div className="h-full overflow-auto p-3">
       <div className="mb-3.5 flex flex-wrap gap-2.5">
-        <StatCard label="Versão" value={data.version} />
-        <StatCard label="Conexões" value={data.total_connections} />
-        <StatCard label="Máx. conexões" value={data.max_connections} />
-        <StatCard label="Queries ativas" value={data.active_queries} />
+        <StatCard label={t('obj.version')} value={data.version} />
+        <StatCard label={t('obj.connections')} value={data.total_connections} />
+        <StatCard label={t('obj.max_connections')} value={data.max_connections} />
+        <StatCard label={t('obj.active_queries')} value={data.active_queries} />
       </div>
       <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Databases</h4>
       <DataTable headers={['Name', 'Size']} rows={data.databases.map((d) => [d.name, d.size])} />
-      <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Atividade (sessões)</h4>
+      <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">{t('obj.activity')}</h4>
       <SessionsTable sessions={data.sessions} serverId={node.serverId as number} />
       {data.sessions.length > 0 && <DashboardExtras serverId={node.serverId as number} />}
     </div>
@@ -342,11 +352,12 @@ function ServerDashboard({ node }: { node: TreeNode }) {
 }
 
 function DatabaseDashboard({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const { loading, data, error } = useFetch(
     () => api.dbDashboard(node.serverId as number, node.database as string),
     [node.key],
   );
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
   if (!data) return null;
 
@@ -356,12 +367,12 @@ function DatabaseDashboard({ node }: { node: TreeNode }) {
   return (
     <div className="h-full overflow-auto p-3">
       <div className="mb-3.5 flex flex-wrap gap-2.5">
-        <StatCard label="Tamanho" value={data.database_size} />
-        <StatCard label="Conexões" value={data.connections} />
-        <StatCard label="Queries ativas" value={data.active_queries} />
-        <StatCard label="Idle" value={data.idle} />
+        <StatCard label={t('obj.size')} value={data.database_size} />
+        <StatCard label={t('obj.connections')} value={data.connections} />
+        <StatCard label={t('obj.active_queries')} value={data.active_queries} />
+        <StatCard label={t('obj.idle')} value={data.idle} />
       </div>
-      <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">Atividade (sessões)</h4>
+      <h4 className="mt-3.5 mb-1.5 text-xs uppercase tracking-wide text-muted">{t('obj.activity')}</h4>
       <SessionsTable sessions={data.sessions} serverId={serverId} database={database} />
       <DashboardExtras serverId={serverId} database={database} />
     </div>
@@ -369,6 +380,7 @@ function DatabaseDashboard({ node }: { node: TreeNode }) {
 }
 
 function DashboardExtras({ serverId, database }: { serverId: number; database?: string }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<'locks' | 'settings' | 'performance'>('locks');
   const locks = useFetch(() => api.locks(serverId, database || 'postgres'), [serverId, database]);
   const settings = useFetch(() => api.settings(serverId, database || 'postgres'), [serverId, database]);
@@ -384,29 +396,29 @@ function DashboardExtras({ serverId, database }: { serverId: number; database?: 
     <div className="mt-4 border-t border-border pt-2">
       <div className="flex gap-1">
         <button className={`cursor-pointer border-none border-r border-border px-3 py-1 text-[13px] hover:bg-[#d7dbe1] ${tab === 'locks' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('locks')}>
-          Locks
+          {t('obj.locks')}
         </button>
         <button className={`cursor-pointer border-none border-r border-border px-3 py-1 text-[13px] hover:bg-[#d7dbe1] ${tab === 'settings' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('settings')}>
-          Configurações
+          {t('obj.settings')}
         </button>
         <button className={`cursor-pointer border-none border-r border-border px-3 py-1 text-[13px] hover:bg-[#d7dbe1] ${tab === 'performance' ? 'border-t-2 border-pg-blue bg-panel-bg font-medium' : ''}`} onClick={() => setTab('performance')}>
-          Performance
+          {t('obj.performance')}
         </button>
       </div>
       <div className="mt-2">
         {tab === 'locks' && (
-          locks.loading ? <div className="italic text-muted">Carregando...</div> :
+          locks.loading ? <div className="italic text-muted">{t('obj.loading')}</div> :
           locks.error ? <div className="text-danger">{locks.error.message}</div> :
           <DataTable
             headers={['PID', 'Database', 'User', 'Relation', 'Mode', 'Granted', 'Action']}
             rows={(locks.data || []).map((l) => [
               l.pid, l.database, l.user, l.relation, l.mode, l.granted ? 'yes' : 'no',
-              React.createElement('button', { className: 'cursor-pointer border-none bg-transparent text-pg-blue', onClick: () => terminate(l.pid), title: 'Terminar sessão' }, 'terminar'),
+              React.createElement('button', { className: 'cursor-pointer border-none bg-transparent text-pg-blue', onClick: () => terminate(l.pid), title: t('obj.terminate_session') }, t('obj.terminate')),
             ])}
           />
         )}
         {tab === 'settings' && (
-          settings.loading ? <div className="italic text-muted">Carregando...</div> :
+          settings.loading ? <div className="italic text-muted">{t('obj.loading')}</div> :
           settings.error ? <div className="text-danger">{settings.error.message}</div> :
           <DataTable
             headers={['Name', 'Value', 'Unit', 'Context', 'Description']}
@@ -422,6 +434,7 @@ function DashboardExtras({ serverId, database }: { serverId: number; database?: 
 }
 
 function SearchResults({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const serverId = node.serverId as number;
   const database = node.database as string;
   const query = node.name || '';
@@ -431,12 +444,12 @@ function SearchResults({ node }: { node: TreeNode }) {
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border-soft bg-[#f4f6f8] px-3 py-2">
         <span className="inline-flex shrink-0 text-[#3a6ea5]"><Fa name="search" /></span>
-        <span className="text-sm font-medium">Busca: {query}</span>
+        <span className="text-sm font-medium">{t('obj.search_header', { query })}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-3">
-        {loading ? <div className="italic text-muted">Buscando...</div> :
+        {loading ? <div className="italic text-muted">{t('obj.searching')}</div> :
          error ? <div className="text-danger">{error.message}</div> :
-         !data || !data.length ? <div className="italic text-muted">Nenhum objeto encontrado.</div> :
+         !data || !data.length ? <div className="italic text-muted">{t('obj.no_search_results')}</div> :
          <DataTable headers={['Schema', 'Name', 'Kind', 'Detail']} rows={(data || []).map((o) => [o.schema, o.name, o.kind, o.detail])} />}
       </div>
     </div>
@@ -444,6 +457,7 @@ function SearchResults({ node }: { node: TreeNode }) {
 }
 
 function SessionsTable({ sessions, serverId, database }: { sessions: { pid: number; database: string; user: string; state: string; query: string; duration: string }[]; serverId?: number; database?: string }) {
+  const { t } = useTranslation();
   const runAction = async (pid: number, terminate: boolean) => {
     if (!serverId) return;
     try {
@@ -459,8 +473,8 @@ function SessionsTable({ sessions, serverId, database }: { sessions: { pid: numb
       rows={(sessions || []).map((s) => serverId
         ? [s.pid, s.database, s.user, s.state, s.query, s.duration,
            React.createElement('span', { className: 'flex gap-1' },
-             React.createElement('button', { className: 'cursor-pointer border-none bg-transparent text-pg-blue', onClick: () => runAction(s.pid, false), title: 'Cancelar query (pg_cancel_backend)' }, 'cancelar'),
-             React.createElement('button', { className: 'cursor-pointer border-none bg-transparent text-danger', onClick: () => runAction(s.pid, true), title: 'Terminar sessão' }, 'terminar'),
+             React.createElement('button', { className: 'cursor-pointer border-none bg-transparent text-pg-blue', onClick: () => runAction(s.pid, false), title: t('obj.cancel_query') }, t('obj.cancel')),
+             React.createElement('button', { className: 'cursor-pointer border-none bg-transparent text-danger', onClick: () => runAction(s.pid, true), title: t('obj.terminate_session') }, t('obj.terminate')),
            )]
         : [s.pid, s.database, s.user, s.state, s.query, s.duration])}
     />
@@ -487,6 +501,7 @@ export function DataTable({
   withRowNumbers?: boolean;
   selectable?: boolean;
 }) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [anchor, setAnchor] = useState<number | null>(null);
   const [copyHint, setCopyHint] = useState<string | null>(null);
@@ -537,8 +552,8 @@ export function DataTable({
     e.preventDefault();
     await copyToClipboard(text);
     setCopyHint(withHeader
-      ? `${idxs.length} linha(s) copiada(s) com cabeçalho`
-      : `${idxs.length} linha(s) copiada(s)`);
+      ? t('obj.copied_header', { count: idxs.length })
+      : t('obj.copied', { count: idxs.length }));
     window.setTimeout(() => setCopyHint(null), 2000);
   };
 
@@ -579,8 +594,8 @@ export function DataTable({
     const text = rowsAsText(idxs, withHeader, '\t');
     await copyToClipboard(text);
     setCopyHint(withHeader
-      ? `${idxs.length} linha(s) copiada(s) com cabeçalho`
-      : `${idxs.length} linha(s) copiada(s)`);
+      ? t('obj.copied_header', { count: idxs.length })
+      : t('obj.copied', { count: idxs.length }));
     setContextMenu(null);
     window.setTimeout(() => setCopyHint(null), 2000);
   };
@@ -633,21 +648,21 @@ export function DataTable({
             className="flex w-full cursor-pointer items-center gap-2 border-none bg-transparent px-3 py-1.5 text-left text-[13px] hover:bg-[#e8edf2]"
             onClick={() => handleContextAction('copy')}
           >
-            Copiar
+            {t('obj.copy')}
           </button>
           <button
             className="flex w-full cursor-pointer items-center gap-2 border-none bg-transparent px-3 py-1.5 text-left text-[13px] hover:bg-[#e8edf2]"
             onClick={() => handleContextAction('copyHeader')}
           >
-            Copiar com cabeçalho
+            {t('obj.copy_with_header')}
           </button>
         </div>
       )}
       {selectable && (
         <div className="shrink-0 border-t border-border bg-[#f4f6f8] px-2.5 py-1 text-[11px] text-muted">
-          {selected.size > 0 ? `${selected.size} linha(s) selecionada(s)` : `${rows.length} linha(s)`}
+          {selected.size > 0 ? t('obj.rows_selected', { count: selected.size }) : t('obj.rows_total', { count: rows.length })}
           {' • '}
-          Ctrl+C: copiar • Ctrl+Shift+C: copiar com cabeçalho • Ctrl+A: selecionar tudo
+          {t('obj.copy_hint')}
         </div>
       )}
     </div>
@@ -655,6 +670,7 @@ export function DataTable({
 }
 
 function DependenciesView({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const schema = (node.schema as string) || '';
   const kind = node.type === 'schema' ? 'schema' : (OBJECT_KINDS[node.type] || node.type);
   const name = (node.name as string) || '';
@@ -662,9 +678,9 @@ function DependenciesView({ node }: { node: TreeNode }) {
     () => api.dependencies(node.serverId as number, node.database as string, schema, kind, name),
     [node.key],
   );
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
-  if (!data || !data.length) return <div className="p-5 italic text-muted">Nenhuma dependência.</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">{t('obj.no_dependencies')}</div>;
   return (
     <DataTable
       headers={['Type', 'Schema', 'Name', 'Owner', 'Dep Type']}
@@ -674,6 +690,7 @@ function DependenciesView({ node }: { node: TreeNode }) {
 }
 
 function DependentsView({ node }: { node: TreeNode }) {
+  const { t } = useTranslation();
   const schema = (node.schema as string) || '';
   const kind = node.type === 'schema' ? 'schema' : (OBJECT_KINDS[node.type] || node.type);
   const name = (node.name as string) || '';
@@ -681,9 +698,9 @@ function DependentsView({ node }: { node: TreeNode }) {
     () => api.dependents(node.serverId as number, node.database as string, schema, kind, name),
     [node.key],
   );
-  if (loading) return <div className="p-5 italic text-muted">Carregando...</div>;
+  if (loading) return <div className="p-5 italic text-muted">{t('obj.loading')}</div>;
   if (error) return <div className="p-5 text-danger">{error.message}</div>;
-  if (!data || !data.length) return <div className="p-5 italic text-muted">Nenhum dependente.</div>;
+  if (!data || !data.length) return <div className="p-5 italic text-muted">{t('obj.no_dependents')}</div>;
   return (
     <DataTable
       headers={['Type', 'Schema', 'Name', 'Owner', 'Dep Type']}

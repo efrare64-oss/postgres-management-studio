@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { api } from '../../api';
 
@@ -17,6 +18,7 @@ interface PartitionDialogProps {
 }
 
 export default function PartitionDialog({ mode, serverId, database, schema, table, onSaved, onClose }: PartitionDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [partition, setPartition] = useState('');
   const [bounds, setBounds] = useState('');
@@ -26,8 +28,8 @@ export default function PartitionDialog({ mode, serverId, database, schema, tabl
   const submit = async () => {
     setError(null);
     if (mode === 'add') {
-      if (!name.trim() || !bounds.trim()) { setError('Informe o nome da partição e os bounds.'); return; }
-    } else if (!partition.trim() || !bounds.trim()) { setError('Informe a tabela da partição e os bounds.'); return; }
+      if (!name.trim() || !bounds.trim()) { setError(t('dialog.partition.required_name')); return; }
+    } else if (!partition.trim() || !bounds.trim()) { setError(t('dialog.partition.required_table')); return; }
     setBusy(true);
     try {
       if (mode === 'add') {
@@ -45,19 +47,19 @@ export default function PartitionDialog({ mode, serverId, database, schema, tabl
   };
 
   return (
-    <Modal title={mode === 'add' ? `Nova partição em ${table}` : `Anexar partição em ${table}`} onClose={onClose} width={560}>
+    <Modal title={mode === 'add' ? t('dialog.partition.title_add', { table }) : t('dialog.partition.title_attach', { table })} onClose={onClose} width={560}>
       <div className="form">
         {mode === 'add' ? (
-          <div className="form-row"><label>Nome</label><input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="ex: p2024" /></div>
+          <div className="form-row"><label>{t('dialog.partition.name')}</label><input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={t('dialog.partition.name_hint')} /></div>
         ) : (
-          <div className="form-row"><label>Tabela da partição</label><input value={partition} onChange={(e) => setPartition(e.target.value)} autoFocus placeholder="ex: schema.p2024" /></div>
+          <div className="form-row"><label>{t('dialog.partition.table')}</label><input value={partition} onChange={(e) => setPartition(e.target.value)} autoFocus placeholder={t('dialog.partition.table_hint')} /></div>
         )}
         <div className="form-row"><label>Bounds</label><input value={bounds} onChange={(e) => setBounds(e.target.value)} placeholder={RANGE_EXAMPLE} /></div>
-        <p className="mb-1 text-[12px] text-muted">Exemplos: RANGE {RANGE_EXAMPLE} • LIST {LIST_EXAMPLE} • HASH {HASH_EXAMPLE}</p>
+        <p className="mb-1 text-[12px] text-muted">{t('dialog.partition.help')}</p>
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn primary" disabled={busy} onClick={submit}>{busy ? 'Salvando...' : mode === 'add' ? 'Criar partição' : 'Anexar partição'}</button>
+          <button className="btn" onClick={onClose}>{t('dialog.cancel.button')}</button>
+          <button className="btn primary" disabled={busy} onClick={submit}>{busy ? t('dialog.partition.saving') : mode === 'add' ? t('dialog.partition.create') : t('dialog.partition.attach')}</button>
         </div>
       </div>
     </Modal>

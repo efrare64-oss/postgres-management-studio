@@ -38,6 +38,7 @@ func Wire(ctx context.Context, cfg *config.Config, frontend fs.FS) (*App, error)
 
 	serverRepo := persistence.NewServerRepository(studioDB)
 	groupRepo := persistence.NewGroupRepository(studioDB)
+	settingsRepo := persistence.NewSettingsRepository(studioDB)
 	clusterRepo := remote.NewClusterRepository()
 	queryRepo := remote.NewQueryRepository()
 	queryHistoryRepo := persistence.NewQueryHistoryRepository(studioDB)
@@ -48,7 +49,7 @@ func Wire(ctx context.Context, cfg *config.Config, frontend fs.FS) (*App, error)
 	querySvc := appquery.NewService(serverRepo, queryRepo, connManagement, queryHistoryRepo)
 	toolsSvc := apptools.NewService(serverRepo, cfg)
 
-	srv := httpserver.New(serverSvc, clusterSvc, querySvc, groupSvc, toolsSvc, connManagement, frontend)
+	srv := httpserver.New(cfg, serverSvc, clusterSvc, querySvc, groupSvc, toolsSvc, connManagement, frontend, settingsRepo)
 
 	return &App{
 		Server: srv,

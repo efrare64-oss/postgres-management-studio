@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { api } from '../../api';
 
@@ -16,6 +17,7 @@ const COMMON_EXTENSIONS = [
 ];
 
 export default function ExtensionDialog({ serverId, database, onSaved, onClose }: ExtensionDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [schema, setSchema] = useState('');
   const [busy, setBusy] = useState(false);
@@ -23,7 +25,7 @@ export default function ExtensionDialog({ serverId, database, onSaved, onClose }
 
   const submit = async () => {
     setError(null);
-    if (!name.trim()) { setError('Informe o nome da extensão.'); return; }
+    if (!name.trim()) { setError(t('dialog.extension.required')); return; }
     setBusy(true);
     try {
       await api.createExtension(serverId, database, name.trim(), schema.trim());
@@ -37,20 +39,20 @@ export default function ExtensionDialog({ serverId, database, onSaved, onClose }
   };
 
   return (
-    <Modal title="Nova Extension" onClose={onClose} width={480}>
+    <Modal title={t('dialog.extension.title')} onClose={onClose} width={480}>
       <div className="form">
         <div className="form-row">
-          <label>Nome</label>
+          <label>{t('dialog.extension.name')}</label>
           <input list="extension-options" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           <datalist id="extension-options">
             {COMMON_EXTENSIONS.map((e) => <option key={e} value={e} />)}
           </datalist>
         </div>
-        <div className="form-row"><label>Schema</label><input value={schema} onChange={(e) => setSchema(e.target.value)} placeholder="public" /></div>
+        <div className="form-row"><label>{t('dialog.extension.schema')}</label><input value={schema} onChange={(e) => setSchema(e.target.value)} placeholder="public" /></div>
         {error && <div className="form-error">{error}</div>}
         <div className="form-actions">
-          <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn primary" disabled={busy} onClick={submit}>{busy ? 'Criando...' : 'Criar extension'}</button>
+          <button className="btn" onClick={onClose}>{t('dialog.cancel.button')}</button>
+          <button className="btn primary" disabled={busy} onClick={submit}>{busy ? t('dialog.extension.creating') : t('dialog.extension.create')}</button>
         </div>
       </div>
     </Modal>
