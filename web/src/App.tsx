@@ -1005,7 +1005,7 @@ export default function App() {
   return (
     <ThemeProvider>
     <div className="flex h-screen flex-col">
-      <Header version="v0.4.0" />
+      <Header version="v0.5.0" />
       <MenuBar items={menuItems} openMenu={openMenu} onOpenMenu={setOpenMenu} />
       <Toolbar items={toolbar} />
 

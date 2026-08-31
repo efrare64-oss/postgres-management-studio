@@ -18,7 +18,7 @@ export default function AboutDialog({ onClose }: AboutDialogProps) {
             <p className="m-0 text-sm text-muted">{t('about.description')}</p>
           </div>
         </div>
-        <p>{t('about.version')} 0.4.0 • Stack: Go, React + TypeScript + Vite 8. + Tailwind 4.</p>
+        <p>{t('about.version')} 0.5.0 • Stack: Go, React + TypeScript + Vite 8. + Tailwind 4.</p>
       </div>
     </Modal>
   );

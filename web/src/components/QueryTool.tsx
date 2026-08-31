@@ -379,26 +379,48 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
         mode === 'explain' || mode === 'explain-analyze',
         mode === 'explain-analyze',
       );
-      setResults(data.results ?? []);
-      setShowResults(true);
-      setTab(data.error ? 'messages' : 'results');
       const results = data.results ?? [];
+      setResults(results);
+      setShowResults(true);
+
+      const hasSelectResults = results.some((r) => r.columns.length > 0);
+
       if (results.length === 0 && !data.error) {
         pushMessage(t('query.no_command'));
       }
+
       results.forEach((r, idx) => {
         const label = results.length > 1 ? `[${idx + 1}] ` : '';
         const rows = r.rows ?? [];
         const columns = r.columns ?? [];
+        const st = (r as QueryResult).statement_type ?? '';
+
         if (mode !== 'execute') {
           pushMessage(`${label}${t('query.explain_result', { ms: r.duration_ms })}`);
         } else if (columns.length > 0) {
           pushMessage(`${label}${t('query.select_result', { count: rows.length, ms: r.duration_ms })}`);
+        } else if (st === 'INSERT') {
+          pushMessage(`${label}${t('query.insert_result', { count: r.rows_affected, ms: r.duration_ms })}`);
+        } else if (st === 'UPDATE') {
+          pushMessage(`${label}${t('query.update_result', { count: r.rows_affected, ms: r.duration_ms })}`);
+        } else if (st === 'DELETE') {
+          pushMessage(`${label}${t('query.delete_result', { count: r.rows_affected, ms: r.duration_ms })}`);
+        } else if (st === 'TRUNCATE') {
+          pushMessage(`${label}${t('query.truncate_result', { ms: r.duration_ms })}`);
         } else {
           pushMessage(`${label}${t('query.affected_result', { count: r.rows_affected, ms: r.duration_ms })}`);
         }
       });
-      if (data.error) pushMessage(data.error);
+
+      if (data.error) {
+        setError(data.error);
+        setTab('messages');
+      } else if (hasSelectResults) {
+        setTab('results');
+      } else {
+        setTab('messages');
+      }
+
       refreshHistory();
     } catch (err) {
       setError((err as Error).message);
@@ -595,10 +617,76 @@ const QueryTool = forwardRef<QueryToolHandle, QueryToolProps>(function QueryTool
         e.preventDefault();
         setShowResults((v) => !v);
       }
+      if (e.shiftKey && e.altKey && editorView) {
+        const view = editorView;
+        if (!view) return;
+        const sel = view.state.selection;
+        const main = sel.main;
+        const docLen = view.state.doc.length;
+        const code = e.code;
+
+        if (code === 'ArrowRight') {
+          e.preventDefault();
+          const head = Math.min(main.head + 1, docLen);
+          const anchor = main.empty ? main.head : main.anchor;
+          view.dispatch({ selection: EditorSelection.single(anchor, head), scrollIntoView: true });
+          view.focus();
+          return;
+        }
+
+        if (code === 'ArrowLeft') {
+          e.preventDefault();
+          const head = Math.max(main.head - 1, 0);
+          const anchor = main.empty ? main.head : main.anchor;
+          view.dispatch({ selection: EditorSelection.single(anchor, head), scrollIntoView: true });
+          view.focus();
+          return;
+        }
+
+        if (code === 'ArrowDown') {
+          e.preventDefault();
+          const ranges = sel.ranges;
+          const lastRange = ranges[ranges.length - 1];
+          const lastAnchorLine = view.state.doc.lineAt(lastRange.anchor);
+          const lastHeadLine = view.state.doc.lineAt(lastRange.head);
+          const leftCol = Math.min(lastRange.anchor - lastAnchorLine.from, lastRange.head - lastHeadLine.from);
+          const rightCol = Math.max(lastRange.anchor - lastAnchorLine.from, lastRange.head - lastHeadLine.from);
+
+          if (lastHeadLine.number < view.state.doc.lines) {
+            const nextLine = view.state.doc.line(lastHeadLine.number + 1);
+            const from = nextLine.from + leftCol;
+            const to = nextLine.from + Math.min(rightCol, nextLine.length);
+            const newRanges = [...ranges, EditorSelection.range(from, to)];
+            view.dispatch({ selection: EditorSelection.create(newRanges), scrollIntoView: true });
+            view.focus();
+          }
+          return;
+        }
+
+        if (code === 'ArrowUp') {
+          e.preventDefault();
+          const ranges = sel.ranges;
+          const firstRange = ranges[0];
+          const firstAnchorLine = view.state.doc.lineAt(firstRange.anchor);
+          const firstHeadLine = view.state.doc.lineAt(firstRange.head);
+          const leftCol = Math.min(firstRange.anchor - firstAnchorLine.from, firstRange.head - firstHeadLine.from);
+          const rightCol = Math.max(firstRange.anchor - firstAnchorLine.from, firstRange.head - firstHeadLine.from);
+
+          if (firstAnchorLine.number > 1) {
+            const prevLine = view.state.doc.line(firstAnchorLine.number - 1);
+            const from = prevLine.from + leftCol;
+            const to = prevLine.from + Math.min(rightCol, prevLine.length);
+            const newRanges = [EditorSelection.range(from, to), ...ranges];
+            view.dispatch({ selection: EditorSelection.create(newRanges), scrollIntoView: true });
+            view.focus();
+          }
+          return;
+        }
+      }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [isActive, run, saveFile, saveFileAs, openFile, newFile, openFind]);
+  }, [isActive, run, saveFile, saveFileAs, openFile, newFile, openFind, editorView]);
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {

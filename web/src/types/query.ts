@@ -3,6 +3,7 @@ export interface QueryResult {
   rows: unknown[][];
   rows_affected: number;
   duration_ms: number;
+  statement_type: string;
   error?: string;
 }
 

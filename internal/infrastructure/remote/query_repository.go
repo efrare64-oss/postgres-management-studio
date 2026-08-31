@@ -31,7 +31,7 @@ func (r *QueryRepository) Execute(ctx context.Context, q connection.Querier, sql
 	}
 	defer rows.Close()
 
-	return r.collect(start, rows)
+	return r.collect(start, rows, sql)
 }
 
 func (r *QueryRepository) ExecuteBatch(ctx context.Context, q connection.Querier, sql string) ([]*query.Result, error) {
@@ -59,7 +59,7 @@ func (r *QueryRepository) Explain(ctx context.Context, q connection.Querier, sql
 	}
 	defer rows.Close()
 
-	return r.collect(start, rows)
+	return r.collect(start, rows, sql)
 }
 
 func (r *QueryRepository) ExplainBatch(ctx context.Context, q connection.Querier, sql string, analyze bool) ([]*query.Result, error) {
@@ -76,7 +76,7 @@ func (r *QueryRepository) ExplainBatch(ctx context.Context, q connection.Querier
 	return results, nil
 }
 
-func (r *QueryRepository) collect(start time.Time, rows pgx.Rows) (*query.Result, error) {
+func (r *QueryRepository) collect(start time.Time, rows pgx.Rows, sql string) (*query.Result, error) {
 	fields := rows.FieldDescriptions()
 	columns := make([]string, len(fields))
 	for i, f := range fields {
@@ -98,11 +98,14 @@ func (r *QueryRepository) collect(start time.Time, rows pgx.Rows) (*query.Result
 		return nil, fmt.Errorf("iterate rows: %w", err)
 	}
 
+	stmtType := detectStatementType(sql)
+
 	return &query.Result{
-		Columns:      columns,
-		Rows:         result,
-		RowsAffected: rows.CommandTag().RowsAffected(),
-		DurationMs:   time.Since(start).Milliseconds(),
+		Columns:       columns,
+		Rows:          result,
+		RowsAffected:  rows.CommandTag().RowsAffected(),
+		DurationMs:    time.Since(start).Milliseconds(),
+		StatementType: stmtType,
 	}, nil
 }
 
@@ -168,6 +171,36 @@ func normalizeCell(v any) any {
 
 func formatUUID(b [16]byte) string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// detectStatementType determines the type of a SQL statement by inspecting its
+// first keyword. Returns one of: SELECT, INSERT, UPDATE, DELETE, DDL, COPY, SHOW, EXPLAIN.
+func detectStatementType(sql string) string {
+	trimmed := strings.TrimSpace(sql)
+	upper := strings.ToUpper(trimmed)
+
+	switch {
+	case strings.HasPrefix(upper, "SELECT") || strings.HasPrefix(upper, "WITH") || strings.HasPrefix(upper, "TABLE") || strings.HasPrefix(upper, "VALUES"):
+		return "SELECT"
+	case strings.HasPrefix(upper, "INSERT"):
+		return "INSERT"
+	case strings.HasPrefix(upper, "UPDATE"):
+		return "UPDATE"
+	case strings.HasPrefix(upper, "DELETE"):
+		return "DELETE"
+	case strings.HasPrefix(upper, "TRUNCATE"):
+		return "TRUNCATE"
+	case strings.HasPrefix(upper, "COPY"):
+		return "COPY"
+	case strings.HasPrefix(upper, "EXPLAIN"):
+		return "EXPLAIN"
+	case strings.HasPrefix(upper, "SHOW"):
+		return "SHOW"
+	case strings.HasPrefix(upper, "CREATE") || strings.HasPrefix(upper, "ALTER") || strings.HasPrefix(upper, "DROP") || strings.HasPrefix(upper, "RENAME") || strings.HasPrefix(upper, "COMMENT") || strings.HasPrefix(upper, "GRANT") || strings.HasPrefix(upper, "REVOKE") || strings.HasPrefix(upper, "SET") || strings.HasPrefix(upper, "RESET") || strings.HasPrefix(upper, "VACUUM") || strings.HasPrefix(upper, "ANALYZE") || strings.HasPrefix(upper, "CLUSTER") || strings.HasPrefix(upper, "REINDEX") || strings.HasPrefix(upper, "REFRESH") || strings.HasPrefix(upper, "DISCARD") || strings.HasPrefix(upper, "LISTEN") || strings.HasPrefix(upper, "UNLISTEN") || strings.HasPrefix(upper, "NOTIFY") || strings.HasPrefix(upper, "DO") || strings.HasPrefix(upper, "BEGIN") || strings.HasPrefix(upper, "START") || strings.HasPrefix(upper, "COMMIT") || strings.HasPrefix(upper, "ROLLBACK") || strings.HasPrefix(upper, "SAVEPOINT") || strings.HasPrefix(upper, "RELEASE") || strings.HasPrefix(upper, "LOCK") || strings.HasPrefix(upper, "UNLOCK") || strings.HasPrefix(upper, "DEALLOCATE") || strings.HasPrefix(upper, "PREPARE") || strings.HasPrefix(upper, "EXECUTE") || strings.HasPrefix(upper, "IMPORT") || strings.HasPrefix(upper, "EXPORT"):
+		return "DDL"
+	default:
+		return "DDL"
+	}
 }
 
 func boolStr(b bool) string {
